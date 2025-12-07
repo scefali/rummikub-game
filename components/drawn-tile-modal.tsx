@@ -55,14 +55,18 @@ export function DrawnTileModal({ tile, onClose }: DrawnTileModalProps) {
           "flex flex-col items-center gap-4 transition-all duration-300",
           isVisible && !isLeaving ? "scale-100 opacity-100" : "scale-75 opacity-0",
         )}
+        onClick={handleDismiss} // Added onClick directly to inner div as well for better click handling
       >
         <p className="text-lg font-semibold text-white">You drew:</p>
-        <button
+        <div
           className="transform scale-[2.5] my-8 cursor-pointer transition-transform hover:scale-[2.7] active:scale-[2.3]"
-          onClick={handleDismiss}
+          onClick={(e) => {
+            e.stopPropagation()
+            handleDismiss()
+          }}
         >
           <GameTile tile={tile} size="lg" />
-        </button>
+        </div>
         <p className="text-sm text-white/70">Tap tile or anywhere to continue</p>
       </div>
     </div>
