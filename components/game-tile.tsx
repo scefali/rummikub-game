@@ -102,18 +102,16 @@ export function GameTile({
       )}
     >
       {tile.isJoker ? (
-        displayAssigned ? (
-          <div className="relative flex items-center justify-center w-full h-full">
-            <span className={cn(colorClasses[displayColor], "font-black")}>{tile.assignedNumber}</span>
-            <div className="absolute top-0.5 right-0.5 w-3 h-3">
-              <JokerIcon />
-            </div>
-          </div>
-        ) : (
+        <div className="relative flex items-center justify-center w-full h-full">
           <div className="w-3/4 h-3/4">
             <JokerIcon />
           </div>
-        )
+          {displayAssigned && (
+            <span className={cn("absolute top-0 left-0.5 font-black text-xs", colorClasses[displayColor])}>
+              {tile.assignedNumber}
+            </span>
+          )}
+        </div>
       ) : (
         <span className={cn(colorClasses[tile.color], "font-black")}>{tile.number}</span>
       )}
