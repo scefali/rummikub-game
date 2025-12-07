@@ -234,61 +234,18 @@ export function isValidMeld(meld: Meld): boolean {
 
 // Calculate the point value of tiles (for initial 30-point requirement)
 export function calculateMeldPoints(tiles: Tile[]): number {
-  return tiles.reduce((sum, tile) => sum + (tile.isJoker ? 0 : tile.number), 0)
+  return tiles.reduce((sum, tile) => {
+    if (tile.isJoker) {
+      // Use assigned number if available (from a processed meld)
+      return sum + (tile.assignedNumber ?? 0)
+    }
+    return sum + tile.number
+  }, 0)
 }
 
-// Validate all melds on the table
-export function validateAllMelds(melds: Meld[]): boolean {
-  return melds.every(isValidMeld)
-}
-
-// Check if player can end their turn (all melds valid, initial meld requirement met)
-export function canEndTurn(
-  player: Player,
-  melds: Meld[],
-  turnStartHand: Tile[],
-  turnStartMelds: Meld[],
-  workingArea: Tile[] = [],
-): { valid: boolean; reason?: string } {
-  // Working area must be empty - all tiles must be placed in melds
-  if (workingArea.length > 0) {
-    return { valid: false, reason: "All tiles in the working area must be placed in melds" }
-  }
-
-  // All melds must be valid
-  if (!validateAllMelds(melds)) {
-    return { valid: false, reason: "Some melds on the table are invalid" }
-  }
-
-  // Check if player has placed any tiles
-  const tilesPlayed = turnStartHand.length - player.hand.length
-  if (tilesPlayed <= 0) {
-    return { valid: false, reason: "You must play at least one tile or draw" }
-  }
-
-  // Check initial meld requirement
-  if (!player.hasInitialMeld) {
-    // Calculate points from new melds only
-    const newTileIds = new Set(turnStartHand.filter((t) => !player.hand.some((h) => h.id === t.id)).map((t) => t.id))
-
-    let newMeldPoints = 0
-    for (const meld of melds) {
-      const meldNewTiles = meld.tiles.filter((t) => newTileIds.has(t.id))
-      if (meldNewTiles.length === meld.tiles.length) {
-        // Entire meld is new
-        newMeldPoints += calculateMeldPoints(meld.tiles)
-      }
-    }
-
-    if (newMeldPoints < 30) {
-      return {
-        valid: false,
-        reason: `Initial meld must be at least 30 points (you have ${newMeldPoints})`,
-      }
-    }
-  }
-
-  return { valid: true }
+export function calculateProcessedMeldPoints(meld: Meld): number {
+  const processed = processMeld(meld)
+  return calculateMeldPoints(processed.tiles)
 }
 
 // Draw a tile from the pool
@@ -325,4 +282,57 @@ export function checkGameEnd(gameState: GameState): { ended: boolean; winner?: s
   }
 
   return { ended: false }
+}
+
+// Check if player can end their turn (all melds valid, initial meld requirement met)
+export function canEndTurn(
+  player: Player,
+  melds: Meld[],
+  turnStartHand: Tile[],
+  turnStartMelds: Meld[],
+  workingArea: Tile[] = [],
+): { valid: boolean; reason?: string } {
+  // Working area must be empty - all tiles must be placed in melds
+  if (workingArea.length > 0) {
+    return { valid: false, reason: "All tiles in the working area must be placed in melds" }
+  }
+
+  // All melds must be valid
+  const validateAllMelds = (melds: Meld[]): boolean => {
+    return melds.every((meld) => isValidMeld(meld))
+  }
+
+  if (!validateAllMelds(melds)) {
+    return { valid: false, reason: "Some melds on the table are invalid" }
+  }
+
+  // Check if player has placed any tiles
+  const tilesPlayed = turnStartHand.length - player.hand.length
+  if (tilesPlayed <= 0) {
+    return { valid: false, reason: "You must play at least one tile or draw" }
+  }
+
+  // Check initial meld requirement
+  if (!player.hasInitialMeld) {
+    // Calculate points from new melds only
+    const newTileIds = new Set(turnStartHand.filter((t) => !player.hand.some((h) => h.id === t.id)).map((t) => t.id))
+
+    let newMeldPoints = 0
+    for (const meld of melds) {
+      const meldNewTiles = meld.tiles.filter((t) => newTileIds.has(t.id))
+      if (meldNewTiles.length === meld.tiles.length) {
+        // Entire meld is new - process it to assign joker values before calculating points
+        newMeldPoints += calculateProcessedMeldPoints(meld)
+      }
+    }
+
+    if (newMeldPoints < 30) {
+      return {
+        valid: false,
+        reason: `Initial meld must be at least 30 points (you have ${newMeldPoints})`,
+      }
+    }
+  }
+
+  return { valid: true }
 }
