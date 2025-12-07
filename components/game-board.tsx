@@ -4,12 +4,12 @@ import { useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, Shuffle } from "lucide-react"
+import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
-import { generateId, isValidMeld, canReshuffleTable } from "@/lib/game-logic"
+import { generateId, isValidMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface GameBoardProps {
@@ -20,7 +20,6 @@ interface GameBoardProps {
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
-  onReshuffle: () => void
   error?: string | null
 }
 
@@ -32,7 +31,6 @@ export function GameBoard({
   onDrawTile,
   onEndTurn,
   onResetTurn,
-  onReshuffle,
   error,
 }: GameBoardProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -212,7 +210,6 @@ export function GameBoard({
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
-  const canReshuffle = canUseTableTiles && canReshuffleTable(gameState.melds, workingArea)
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -285,19 +282,6 @@ export function GameBoard({
                 {canUseTableTiles && isMyTurn && " - Click tiles to rearrange"}
               </p>
             </div>
-            {isMyTurn && canUseTableTiles && gameState.melds.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onReshuffle}
-                disabled={!canReshuffle}
-                className="gap-2 cursor-pointer hover:bg-secondary/50 bg-transparent disabled:opacity-40 disabled:cursor-not-allowed"
-                title={!canReshuffle ? "No alternative arrangement available" : "Find another valid arrangement"}
-              >
-                <Shuffle className="w-4 h-4" />
-                Reshuffle Table
-              </Button>
-            )}
           </div>
 
           {/* Melds Grid */}

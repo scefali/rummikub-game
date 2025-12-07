@@ -139,15 +139,6 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     }
   }, [roomCode, playerId, apiCall, pollGameState])
 
-  const reshuffleBoard = useCallback(async () => {
-    try {
-      await apiCall({ action: "reshuffle", roomCode, playerId })
-      pollGameState()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reshuffle table")
-    }
-  }, [roomCode, playerId, apiCall, pollGameState])
-
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -204,7 +195,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     )
   }
 
-  // Game in progress - Pass onReshuffle to both views
+  // Game in progress
   if (isMobile || !isHost) {
     return (
       <PlayerController
@@ -215,7 +206,6 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         onDrawTile={drawTile}
         onEndTurn={endTurn}
         onResetTurn={resetTurn}
-        onReshuffle={reshuffleBoard}
         error={error}
       />
     )
@@ -230,7 +220,6 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       onDrawTile={drawTile}
       onEndTurn={endTurn}
       onResetTurn={resetTurn}
-      onReshuffle={reshuffleBoard}
       error={error}
     />
   )

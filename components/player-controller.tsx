@@ -4,25 +4,12 @@ import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import {
-  Hand,
-  Layers,
-  Plus,
-  X,
-  Download,
-  Send,
-  AlertCircle,
-  Users,
-  Wrench,
-  ArrowLeft,
-  RotateCcw,
-  Shuffle,
-} from "lucide-react"
+import { Hand, Layers, Plus, X, Download, Send, AlertCircle, Users, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
-import { generateId, isValidMeld, calculateMeldPoints, canReshuffleTable } from "@/lib/game-logic"
+import { generateId, isValidMeld, calculateMeldPoints } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface PlayerControllerProps {
@@ -33,7 +20,6 @@ interface PlayerControllerProps {
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
-  onReshuffle: () => void
   error?: string | null
 }
 
@@ -45,7 +31,6 @@ export function PlayerController({
   onDrawTile,
   onEndTurn,
   onResetTurn,
-  onReshuffle,
   error,
 }: PlayerControllerProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -60,7 +45,6 @@ export function PlayerController({
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
 
-  // Sort tiles by color, then by number
   const sortedHand = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
     if (!a.isJoker && b.isJoker) return -1
@@ -99,7 +83,6 @@ export function PlayerController({
     })
   }, [])
 
-  // Get all selected tiles (from hand and working area)
   const allSelectedTiles = [
     ...myHand.filter((t) => selectedTiles.has(t.id)),
     ...workingArea.filter((t) => selectedWorkingTiles.has(t.id)),
@@ -143,7 +126,6 @@ export function PlayerController({
     [myHand, workingArea, selectedTiles, selectedWorkingTiles, gameState.melds, onPlayTiles],
   )
 
-  // Take tile from meld to working area (only allowed after initial meld)
   const takeTileFromMeld = useCallback(
     (tileId: string, meldId: string) => {
       if (!canUseTableTiles) return
@@ -164,30 +146,27 @@ export function PlayerController({
         .filter((m) => m.tiles.length > 0)
 
       onPlayTiles(updatedMelds, myHand, [...workingArea, tile])
+
+      setSelectedWorkingTiles((prev) => new Set([...prev, tileId]))
     },
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
 
-  // Return tile from working area back to hand
   const returnToHand = useCallback(
     (tileId: string) => {
       const tile = workingArea.find((t) => t.id === tileId)
       if (!tile) return
 
-      // Check if this tile was originally from the player's hand (turn start)
       const wasFromHand = gameState.turnStartHand.some((t) => t.id === tileId)
 
       if (wasFromHand) {
-        // Return to hand
         const remainingWorking = workingArea.filter((t) => t.id !== tileId)
         onPlayTiles(gameState.melds, [...myHand, tile], remainingWorking)
       }
-      // If tile was from board, it stays in working area (must be placed in a meld)
     },
     [workingArea, gameState.turnStartHand, gameState.melds, myHand, onPlayTiles],
   )
 
-  // Move selected working tiles back to hand (only tiles that came from hand)
   const returnSelectedToHand = useCallback(() => {
     const tilesToReturn: Tile[] = []
     const tilesToKeep: Tile[] = []
@@ -198,7 +177,7 @@ export function PlayerController({
         if (wasFromHand) {
           tilesToReturn.push(tile)
         } else {
-          tilesToKeep.push(tile) // Must stay in working area
+          tilesToKeep.push(tile)
         }
       } else {
         tilesToKeep.push(tile)
@@ -209,7 +188,6 @@ export function PlayerController({
     setSelectedWorkingTiles(new Set())
   }, [workingArea, selectedWorkingTiles, gameState.turnStartHand, gameState.melds, myHand, onPlayTiles])
 
-  // Break entire meld into working area
   const breakMeld = useCallback(
     (meldId: string) => {
       if (!canUseTableTiles) return
@@ -219,6 +197,8 @@ export function PlayerController({
 
       const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
       onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
+
+      setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
     },
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
@@ -243,23 +223,18 @@ export function PlayerController({
     setSelectedWorkingTiles(new Set())
   }, [onResetTurn])
 
-  // Check if selection would be valid
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
 
-  // Calculate points for initial meld requirement display
   const totalNewPoints = gameState.melds
     .filter((m) => isValidMeld(m))
     .reduce((sum, m) => sum + calculateMeldPoints(m.tiles), 0)
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
 
-  const canReshuffle = canUseTableTiles && canReshuffleTable(gameState.melds, workingArea)
-
   return (
     <div className="h-dvh flex flex-col bg-background overflow-hidden">
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
 
-      {/* Header */}
       <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold text-foreground">Rummikub</h1>
@@ -283,7 +258,6 @@ export function PlayerController({
         </div>
       </header>
 
-      {/* Turn Indicator */}
       <div
         className={cn(
           "flex-shrink-0 py-2 px-4 text-center text-sm font-medium transition-colors",
@@ -305,7 +279,6 @@ export function PlayerController({
         )}
       </div>
 
-      {/* Error Banner */}
       {error && (
         <div className="flex-shrink-0 py-2 px-4 bg-destructive/10 border-b border-destructive/20 flex items-center justify-center gap-2 text-destructive text-sm">
           <AlertCircle className="w-4 h-4" />
@@ -341,7 +314,6 @@ export function PlayerController({
       )}
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Table Area - Scrollable */}
         <div className="flex-1 min-h-0 overflow-auto p-3 border-b border-border/30">
           <div className="flex items-center gap-2 mb-2">
             <Layers className="w-4 h-4 text-muted-foreground" />
@@ -377,8 +349,7 @@ export function PlayerController({
           )}
         </div>
 
-        {/* Working Area - Only show when has tiles or can use table tiles */}
-        {isMyTurn && (workingArea.length > 0 || canUseTableTiles) && (
+        {isMyTurn && workingArea.length > 0 && (
           <div className="flex-shrink-0 bg-amber-500/10 border-b border-amber-500/30 p-3">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -402,37 +373,32 @@ export function PlayerController({
               )}
             </div>
 
-            {workingArea.length === 0 ? (
-              <p className="text-amber-500/70 text-xs text-center py-2">Tap tiles on the table to rearrange them</p>
-            ) : (
-              <div className="overflow-x-auto pb-1 -mx-1 px-1">
-                <div className="flex gap-1.5 min-w-max">
-                  {sortedWorkingArea.map((tile) => {
-                    const wasFromHand = gameState.turnStartHand.some((t) => t.id === tile.id)
-                    return (
-                      <div key={tile.id} className="relative">
-                        <GameTile
-                          tile={tile}
-                          size="sm"
-                          selected={selectedWorkingTiles.has(tile.id)}
-                          onClick={() => toggleWorkingTileSelection(tile.id)}
+            <div className="overflow-x-auto pb-1 -mx-1 px-1">
+              <div className="flex gap-1.5 min-w-max">
+                {sortedWorkingArea.map((tile) => {
+                  const wasFromHand = gameState.turnStartHand.some((t) => t.id === tile.id)
+                  return (
+                    <div key={tile.id} className="relative">
+                      <GameTile
+                        tile={tile}
+                        size="sm"
+                        selected={selectedWorkingTiles.has(tile.id)}
+                        onClick={() => toggleWorkingTileSelection(tile.id)}
+                      />
+                      {!wasFromHand && (
+                        <div
+                          className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full"
+                          title="From table"
                         />
-                        {!wasFromHand && (
-                          <div
-                            className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full"
-                            title="From table"
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* Hand Area - Fixed height with scroll */}
         <div className="flex-shrink-0 bg-card/50 p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -462,7 +428,6 @@ export function PlayerController({
             )}
           </div>
 
-          {/* Initial Meld Hint - Compact */}
           {!myPlayer?.hasInitialMeld && (
             <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
               <p className="text-xs text-foreground">
@@ -502,19 +467,6 @@ export function PlayerController({
               <RotateCcw className="w-3.5 h-3.5" />
               Reset Move
             </Button>
-            {canUseTableTiles && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                onClick={onReshuffle}
-                disabled={!canReshuffle}
-                title={!canReshuffle ? "No alternative arrangement available" : "Find another valid arrangement"}
-              >
-                <Shuffle className="w-3.5 h-3.5" />
-                Reshuffle Table
-              </Button>
-            )}
           </div>
           <div className="flex gap-2">
             <Button

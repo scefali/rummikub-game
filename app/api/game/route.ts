@@ -58,14 +58,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, drawnTile: result.drawnTile })
       }
 
-      case "reshuffle": {
-        const result = await gameStore.reshuffleBoard(roomCode, playerId)
-        if (!result.success) {
-          return NextResponse.json({ error: result.error }, { status: 400 })
-        }
-        return NextResponse.json({ success: true })
-      }
-
       case "end_turn": {
         const result = await gameStore.handleEndTurn(roomCode, playerId)
         if (!result.success) {

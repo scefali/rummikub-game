@@ -9,7 +9,6 @@ import {
   nextPlayer,
   checkGameEnd,
   canEndTurn,
-  reshuffleTable,
 } from "./game-logic"
 
 const redis = new Redis({
@@ -291,39 +290,6 @@ export async function resetTurn(roomCode: string, playerId: string): Promise<{ s
   room.gameState.melds = JSON.parse(JSON.stringify(room.gameState.turnStartMelds))
   currentPlayer.hand = [...room.gameState.turnStartHand]
   room.gameState.workingArea = []
-
-  await setRoom(room)
-
-  return { success: true }
-}
-
-export async function reshuffleBoard(
-  roomCode: string,
-  playerId: string,
-): Promise<{ success: boolean; error?: string }> {
-  const room = await getRoom(roomCode)
-  if (!room || room.gameState.phase !== "playing") {
-    return { success: false, error: "Game not in progress" }
-  }
-
-  const currentPlayer = room.gameState.players[room.gameState.currentPlayerIndex]
-  if (currentPlayer.id !== playerId) {
-    return { success: false, error: "Not your turn" }
-  }
-
-  // Can only reshuffle after initial meld
-  if (!currentPlayer.hasInitialMeld) {
-    return { success: false, error: "Complete your initial meld first" }
-  }
-
-  const result = reshuffleTable(room.gameState.melds, room.gameState.workingArea)
-
-  if (!result.success) {
-    return { success: false, error: "Could not find a valid arrangement" }
-  }
-
-  room.gameState.melds = result.newMelds
-  room.gameState.workingArea = result.remainingTiles
 
   await setRoom(room)
 

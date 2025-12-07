@@ -206,20 +206,6 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     }
   }, [state.roomCode, state.playerId, apiCall, pollGameState])
 
-  const reshuffleBoard = useCallback(async () => {
-    if (!state.roomCode || !state.playerId) return
-    try {
-      await apiCall({
-        action: "reshuffle",
-        roomCode: state.roomCode,
-        playerId: state.playerId,
-      })
-      pollGameState()
-    } catch {
-      // Error handled in apiCall
-    }
-  }, [state.roomCode, state.playerId, apiCall, pollGameState])
-
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -256,7 +242,6 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     drawTile,
     endTurn,
     resetTurn,
-    reshuffleBoard, // Export reshuffleBoard
     disconnect,
   }
 }
