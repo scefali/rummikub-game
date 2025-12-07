@@ -29,8 +29,8 @@ export function MeldDisplay({
   compact = false,
 }: MeldDisplayProps) {
   const isValid = isValidMeld(meld)
-  const points = calculateMeldPoints(meld.tiles)
   const processedMeld = isValid ? processMeld(meld) : meld
+  const points = calculateMeldPoints(processedMeld.tiles)
 
   return (
     <Card

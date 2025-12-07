@@ -27,6 +27,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const isPollingRef = useRef(false)
+  const errorSetTimeRef = useRef<number>(0)
 
   // API call helper
   const apiCall = useCallback(async (body: Record<string, unknown>) => {
@@ -54,7 +55,9 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         playerId,
       })
       setGameState(data.gameState)
-      setError(null)
+      if (Date.now() - errorSetTimeRef.current > 3000) {
+        setError(null)
+      }
       setIsLoading(false)
     } catch (err) {
       // If room not found, clear cookie and redirect
@@ -88,15 +91,20 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     }
   }, [error])
 
+  const setErrorWithTimestamp = useCallback((errorMsg: string) => {
+    errorSetTimeRef.current = Date.now()
+    setError(errorMsg)
+  }, [])
+
   // Game actions
   const startGame = useCallback(async () => {
     try {
       await apiCall({ action: "start_game", roomCode, playerId })
       pollGameState()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start game")
+      setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to start game")
     }
-  }, [roomCode, playerId, apiCall, pollGameState])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const playTiles = useCallback(
     async (melds: Meld[], hand: Tile[], workingArea: Tile[] = []) => {
@@ -104,10 +112,10 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         await apiCall({ action: "play_tiles", roomCode, playerId, melds, hand, workingArea })
         pollGameState()
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to play tiles")
+        setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to play tiles")
       }
     },
-    [roomCode, playerId, apiCall, pollGameState],
+    [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp],
   )
 
   const drawTile = useCallback(async (): Promise<Tile | null> => {
@@ -116,37 +124,37 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       pollGameState()
       return data.drawnTile || null
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to draw tile")
+      setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to draw tile")
       return null
     }
-  }, [roomCode, playerId, apiCall, pollGameState])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const endTurn = useCallback(async () => {
     try {
       await apiCall({ action: "end_turn", roomCode, playerId })
       pollGameState()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to end turn")
+      setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to end turn")
     }
-  }, [roomCode, playerId, apiCall, pollGameState])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const resetTurn = useCallback(async () => {
     try {
       await apiCall({ action: "reset_turn", roomCode, playerId })
       pollGameState()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset turn")
+      setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to reset turn")
     }
-  }, [roomCode, playerId, apiCall, pollGameState])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const endGame = useCallback(async () => {
     try {
       await apiCall({ action: "end_game", roomCode, playerId })
       pollGameState()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to end game")
+      setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to end game")
     }
-  }, [roomCode, playerId, apiCall, pollGameState])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {

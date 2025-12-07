@@ -24,7 +24,7 @@ import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
-import { generateId, isValidMeld, calculateMeldPoints } from "@/lib/game-logic"
+import { generateId, isValidMeld, calculateProcessedMeldPoints, processMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface PlayerControllerProps {
@@ -246,7 +246,7 @@ export function PlayerController({
 
   const totalNewPoints = gameState.melds
     .filter((m) => isValidMeld(m))
-    .reduce((sum, m) => sum + calculateMeldPoints(m.tiles), 0)
+    .reduce((sum, m) => sum + calculateProcessedMeldPoints(processMeld(m)), 0)
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
 
