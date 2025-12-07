@@ -139,6 +139,15 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     }
   }, [roomCode, playerId, apiCall, pollGameState])
 
+  const endGame = useCallback(async () => {
+    try {
+      await apiCall({ action: "end_game", roomCode, playerId })
+      pollGameState()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to end game")
+    }
+  }, [roomCode, playerId, apiCall, pollGameState])
+
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -206,6 +215,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         onDrawTile={drawTile}
         onEndTurn={endTurn}
         onResetTurn={resetTurn}
+        onEndGame={endGame}
         error={error}
       />
     )
@@ -220,6 +230,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       onDrawTile={drawTile}
       onEndTurn={endTurn}
       onResetTurn={resetTurn}
+      onEndGame={endGame}
       error={error}
     />
   )

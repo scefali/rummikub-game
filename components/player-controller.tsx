@@ -17,11 +17,13 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  LogOut,
 } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
+import { EndGameModal } from "@/components/end-game-modal"
 import { generateId, isValidMeld, calculateMeldPoints } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -33,6 +35,7 @@ interface PlayerControllerProps {
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
+  onEndGame: () => void
   error?: string | null
 }
 
@@ -44,6 +47,7 @@ export function PlayerController({
   onDrawTile,
   onEndTurn,
   onResetTurn,
+  onEndGame,
   error,
 }: PlayerControllerProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -51,6 +55,7 @@ export function PlayerController({
   const [showPlayers, setShowPlayers] = useState(false)
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
   const [handExpanded, setHandExpanded] = useState(true)
+  const [showEndGameModal, setShowEndGameModal] = useState(false)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -248,6 +253,7 @@ export function PlayerController({
   return (
     <div className="h-dvh flex flex-col bg-background overflow-hidden">
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
+      <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
 
       <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50">
         <div className="flex items-center gap-2">
@@ -257,6 +263,14 @@ export function PlayerController({
           </Badge>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setShowEndGameModal(true)}
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
           <Button variant="ghost" size="sm" className="gap-1 h-8 px-2" onClick={() => setShowPlayers(!showPlayers)}>
             <Users className="w-4 h-4" />
             {gameState.players.length}

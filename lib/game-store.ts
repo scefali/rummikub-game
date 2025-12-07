@@ -296,6 +296,32 @@ export async function resetTurn(roomCode: string, playerId: string): Promise<{ s
   return { success: true }
 }
 
+export async function endGame(roomCode: string, playerId: string): Promise<{ success: boolean; error?: string }> {
+  const room = await getRoom(roomCode)
+  if (!room) return { success: false, error: "Room not found" }
+
+  // Reset game state to lobby
+  room.gameState.phase = "lobby"
+  room.gameState.melds = []
+  room.gameState.tilePool = []
+  room.gameState.currentPlayerIndex = 0
+  room.gameState.winner = null
+  room.gameState.turnStartMelds = []
+  room.gameState.turnStartHand = []
+  room.gameState.workingArea = []
+
+  // Reset all players
+  room.gameState.players = room.gameState.players.map((p) => ({
+    ...p,
+    hand: [],
+    hasInitialMeld: false,
+  }))
+
+  await setRoom(room)
+
+  return { success: true }
+}
+
 export async function leaveRoom(roomCode: string, playerId: string): Promise<void> {
   const room = await getRoom(roomCode)
   if (!room) return

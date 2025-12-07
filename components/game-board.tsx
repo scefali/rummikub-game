@@ -4,11 +4,12 @@ import { useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
+import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, LogOut } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
+import { EndGameModal } from "@/components/end-game-modal"
 import { generateId, isValidMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -20,6 +21,7 @@ interface GameBoardProps {
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
+  onEndGame: () => void
   error?: string | null
 }
 
@@ -31,11 +33,13 @@ export function GameBoard({
   onDrawTile,
   onEndTurn,
   onResetTurn,
+  onEndGame,
   error,
 }: GameBoardProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
+  const [showEndGameModal, setShowEndGameModal] = useState(false)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -44,7 +48,6 @@ export function GameBoard({
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
 
-  // Sort tiles
   const sortedTiles = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
     if (!a.isJoker && b.isJoker) return -1
@@ -83,7 +86,6 @@ export function GameBoard({
     })
   }, [])
 
-  // Get all selected tiles (from hand and working area)
   const allSelectedTiles = [
     ...myHand.filter((t) => selectedTiles.has(t.id)),
     ...workingArea.filter((t) => selectedWorkingTiles.has(t.id)),
@@ -127,7 +129,6 @@ export function GameBoard({
     [myHand, workingArea, selectedTiles, selectedWorkingTiles, gameState.melds, onPlayTiles],
   )
 
-  // Take tile from meld to working area (only allowed after initial meld)
   const takeTileFromMeld = useCallback(
     (tileId: string, meldId: string) => {
       if (!canUseTableTiles) return
@@ -152,7 +153,6 @@ export function GameBoard({
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
 
-  // Break entire meld into working area
   const breakMeld = useCallback(
     (meldId: string) => {
       if (!canUseTableTiles) return
@@ -166,7 +166,6 @@ export function GameBoard({
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
 
-  // Return selected working tiles to hand (only tiles that came from hand)
   const returnSelectedToHand = useCallback(() => {
     const tilesToReturn: Tile[] = []
     const tilesToKeep: Tile[] = []
@@ -214,8 +213,8 @@ export function GameBoard({
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
+      <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
 
-      {/* Header */}
       <header className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold text-foreground">Rummikub</h1>
@@ -233,10 +232,18 @@ export function GameBoard({
             <Users className="w-4 h-4" />
             <span className="text-sm">{gameState.players.length} players</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setShowEndGameModal(true)}
+          >
+            <LogOut className="w-4 h-4" />
+            End Game
+          </Button>
         </div>
       </header>
 
-      {/* Turn Indicator */}
       <div
         className={cn(
           "py-3 px-4 text-center font-medium transition-colors",
@@ -260,7 +267,6 @@ export function GameBoard({
         )}
       </div>
 
-      {/* Error Banner */}
       {error && (
         <div className="py-2 px-4 bg-destructive/10 border-b border-destructive/20 flex items-center justify-center gap-2 text-destructive">
           <AlertCircle className="w-4 h-4" />
@@ -268,9 +274,7 @@ export function GameBoard({
         </div>
       )}
 
-      {/* Main Game Area */}
       <div className="flex-1 flex">
-        {/* Table / Melds Area */}
         <div className="flex-1 p-6 overflow-auto">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -284,7 +288,6 @@ export function GameBoard({
             </div>
           </div>
 
-          {/* Melds Grid */}
           <div className="flex flex-wrap gap-4">
             {gameState.melds.map((meld) => (
               <MeldDisplay
@@ -312,7 +315,6 @@ export function GameBoard({
           </div>
         </div>
 
-        {/* Players Sidebar */}
         <div className="w-64 border-l border-border/50 bg-card/30 p-4">
           <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wide">Players</h3>
           <div className="space-y-3">
@@ -352,8 +354,7 @@ export function GameBoard({
         </div>
       </div>
 
-      {/* Working Area - Only show when has tiles or can use table tiles */}
-      {isMyTurn && (workingArea.length > 0 || canUseTableTiles) && (
+      {isMyTurn && workingArea.length > 0 && (
         <div className="border-t border-amber-500/30 bg-amber-500/10 p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -371,32 +372,27 @@ export function GameBoard({
             )}
           </div>
 
-          {workingArea.length === 0 ? (
-            <p className="text-amber-500/70 text-sm">Click tiles on the table to pick them up and rearrange</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {sortedWorkingArea.map((tile) => {
-                const wasFromHand = gameState.turnStartHand.some((t) => t.id === tile.id)
-                return (
-                  <div key={tile.id} className="relative">
-                    <GameTile
-                      tile={tile}
-                      size="md"
-                      selected={selectedWorkingTiles.has(tile.id)}
-                      onClick={() => toggleWorkingTileSelection(tile.id)}
-                    />
-                    {!wasFromHand && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full" title="From table" />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {sortedWorkingArea.map((tile) => {
+              const wasFromHand = gameState.turnStartHand.some((t) => t.id === tile.id)
+              return (
+                <div key={tile.id} className="relative">
+                  <GameTile
+                    tile={tile}
+                    size="md"
+                    selected={selectedWorkingTiles.has(tile.id)}
+                    onClick={() => toggleWorkingTileSelection(tile.id)}
+                  />
+                  {!wasFromHand && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full" title="From table" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* My Hand */}
       {myPlayer && (
         <div className="border-t border-border/50 bg-card/50 p-4">
           <div className="flex items-center justify-between mb-3">
@@ -453,7 +449,6 @@ export function GameBoard({
             </div>
           </div>
 
-          {/* Hand tiles */}
           <div className="flex flex-wrap gap-2">
             {sortedTiles.map((tile) => (
               <GameTile
