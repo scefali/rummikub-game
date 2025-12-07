@@ -1,33 +1,79 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, Sparkles } from "lucide-react"
+import { setPlayerCookie } from "@/lib/cookies"
 
-interface HomeScreenProps {
-  onCreateRoom: (playerName: string) => void
-  onJoinRoom: (roomCode: string, playerName: string) => void
-  error?: string | null
+interface HomeClientProps {
+  joinCode?: string
 }
 
-export function HomeScreen({ onCreateRoom, onJoinRoom, error }: HomeScreenProps) {
+export function HomeClient({ joinCode }: HomeClientProps) {
+  const router = useRouter()
   const [playerName, setPlayerName] = useState("")
-  const [roomCode, setRoomCode] = useState("")
+  const [roomCode, setRoomCode] = useState(joinCode || "")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!playerName.trim()) return
     setIsLoading(true)
-    onCreateRoom(playerName.trim())
+    setError(null)
+
+    try {
+      const response = await fetch("/api/game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create_room", playerName: playerName.trim() }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create room")
+      }
+
+      // Set cookie with player info
+      await setPlayerCookie(data.playerId, playerName.trim(), data.roomCode)
+
+      router.push(`/game/${data.roomCode}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create room")
+      setIsLoading(false)
+    }
   }
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (!playerName.trim() || !roomCode.trim()) return
     setIsLoading(true)
-    onJoinRoom(roomCode.trim().toUpperCase(), playerName.trim())
+    setError(null)
+
+    const code = roomCode.trim().toUpperCase()
+
+    try {
+      const response = await fetch("/api/game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "join_room", roomCode: code, playerName: playerName.trim() }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to join room")
+      }
+
+      // Set cookie with player info
+      await setPlayerCookie(data.playerId, playerName.trim(), code)
+
+      router.push(`/game/${code}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to join room")
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -74,7 +120,7 @@ export function HomeScreen({ onCreateRoom, onJoinRoom, error }: HomeScreenProps)
           </div>
 
           {/* Tabs for Create/Join */}
-          <Tabs defaultValue="create" className="w-full">
+          <Tabs defaultValue={joinCode ? "join" : "create"} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="create" className="gap-2">
                 <Sparkles className="w-4 h-4" />

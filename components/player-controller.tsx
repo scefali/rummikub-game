@@ -269,11 +269,11 @@ export function PlayerController({
 
           {/* Initial Meld Hint */}
           {!myPlayer?.hasInitialMeld && (
-            <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg text-center">
-              <p className="text-sm text-accent-foreground">
+            <div className="mt-4 p-3 bg-primary/20 border border-primary/30 rounded-lg text-center">
+              <p className="text-sm text-foreground">
                 First move: Create melds totaling at least <strong>30 points</strong>
                 {totalNewPoints > 0 && (
-                  <span className="block mt-1 text-primary">Current: {totalNewPoints} points</span>
+                  <span className="block mt-1 text-primary font-semibold">Current: {totalNewPoints} points</span>
                 )}
               </p>
             </div>

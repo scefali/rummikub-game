@@ -275,7 +275,7 @@ export function GameBoard({
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Hand</h3>
               {!myPlayer.hasInitialMeld && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="default" className="text-xs">
                   Need 30+ pts for first meld
                 </Badge>
               )}
