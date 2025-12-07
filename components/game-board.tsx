@@ -4,7 +4,7 @@ import { useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft } from "lucide-react"
+import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
@@ -18,6 +18,7 @@ interface GameBoardProps {
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
   onDrawTile: () => void
   onEndTurn: () => void
+  onResetTurn: () => void
   error?: string | null
 }
 
@@ -28,6 +29,7 @@ export function GameBoard({
   onPlayTiles,
   onDrawTile,
   onEndTurn,
+  onResetTurn,
   error,
 }: GameBoardProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -188,6 +190,12 @@ export function GameBoard({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
   }, [])
+
+  const handleResetTurn = useCallback(() => {
+    onResetTurn()
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+  }, [onResetTurn])
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
@@ -405,6 +413,15 @@ export function GameBoard({
               )}
               {isMyTurn && totalSelected === 0 && (
                 <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetTurn}
+                    className="gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset
+                  </Button>
                   <Button variant="outline" size="sm" onClick={onDrawTile}>
                     Draw Tile
                   </Button>

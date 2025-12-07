@@ -66,6 +66,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, gameEnded: result.gameEnded, winner: result.winner })
       }
 
+      case "reset_turn": {
+        const result = await gameStore.resetTurn(roomCode, playerId)
+        if (!result.success) {
+          return NextResponse.json({ error: result.error }, { status: 400 })
+        }
+        return NextResponse.json({ success: true })
+      }
+
       case "leave": {
         await gameStore.leaveRoom(roomCode, playerId)
         return NextResponse.json({ success: true })

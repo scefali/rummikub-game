@@ -191,6 +191,20 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     }
   }, [state.roomCode, state.playerId, apiCall, pollGameState])
 
+  const resetTurn = useCallback(async () => {
+    if (!state.roomCode || !state.playerId) return
+    try {
+      await apiCall({
+        action: "reset_turn",
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+      })
+      pollGameState()
+    } catch {
+      // Error handled in apiCall
+    }
+  }, [state.roomCode, state.playerId, apiCall, pollGameState])
+
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -226,6 +240,7 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     playTiles,
     drawTile,
     endTurn,
+    resetTurn, // Export resetTurn
     disconnect,
   }
 }

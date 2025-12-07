@@ -128,6 +128,15 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     }
   }, [roomCode, playerId, apiCall, pollGameState])
 
+  const resetTurn = useCallback(async () => {
+    try {
+      await apiCall({ action: "reset_turn", roomCode, playerId })
+      pollGameState()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reset turn")
+    }
+  }, [roomCode, playerId, apiCall, pollGameState])
+
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -194,6 +203,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         onPlayTiles={playTiles}
         onDrawTile={drawTile}
         onEndTurn={endTurn}
+        onResetTurn={resetTurn}
         error={error}
       />
     )
@@ -207,6 +217,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       onPlayTiles={playTiles}
       onDrawTile={drawTile}
       onEndTurn={endTurn}
+      onResetTurn={resetTurn}
       error={error}
     />
   )

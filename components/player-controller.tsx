@@ -4,7 +4,7 @@ import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Hand, Layers, Plus, X, Download, Send, AlertCircle, Users, Wrench, ArrowLeft } from "lucide-react"
+import { Hand, Layers, Plus, X, Download, Send, AlertCircle, Users, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
@@ -18,6 +18,7 @@ interface PlayerControllerProps {
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
   onDrawTile: () => void
   onEndTurn: () => void
+  onResetTurn: () => void
   error?: string | null
 }
 
@@ -28,6 +29,7 @@ export function PlayerController({
   onPlayTiles,
   onDrawTile,
   onEndTurn,
+  onResetTurn,
   error,
 }: PlayerControllerProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -214,6 +216,12 @@ export function PlayerController({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
   }, [onDrawTile])
+
+  const handleResetTurn = useCallback(() => {
+    onResetTurn()
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+  }, [onResetTurn])
 
   // Check if selection would be valid
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
@@ -440,9 +448,8 @@ export function PlayerController({
             </div>
           )}
 
-          {/* Tiles - Horizontal scroll */}
-          <div className="overflow-x-auto pb-2 -mx-1 px-1">
-            <div className="flex gap-1.5 min-w-max">
+          <div className="max-h-48 overflow-y-auto pb-2">
+            <div className="flex flex-wrap gap-1.5">
               {sortedHand.map((tile) => (
                 <GameTile
                   key={tile.id}
@@ -461,6 +468,17 @@ export function PlayerController({
 
       {isMyTurn && (
         <div className="flex-shrink-0 p-3 border-t border-border/50 bg-card/80 safe-area-pb">
+          <div className="flex justify-center mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={handleResetTurn}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset Move
+            </Button>
+          </div>
           <div className="flex gap-2">
             <Button
               variant="outline"

@@ -275,6 +275,27 @@ export async function handleEndTurn(
   return { success: true }
 }
 
+export async function resetTurn(roomCode: string, playerId: string): Promise<{ success: boolean; error?: string }> {
+  const room = await getRoom(roomCode)
+  if (!room || room.gameState.phase !== "playing") {
+    return { success: false, error: "Game not in progress" }
+  }
+
+  const currentPlayer = room.gameState.players[room.gameState.currentPlayerIndex]
+  if (currentPlayer.id !== playerId) {
+    return { success: false, error: "Not your turn" }
+  }
+
+  // Restore to turn start state
+  room.gameState.melds = JSON.parse(JSON.stringify(room.gameState.turnStartMelds))
+  currentPlayer.hand = [...room.gameState.turnStartHand]
+  room.gameState.workingArea = []
+
+  await setRoom(room)
+
+  return { success: true }
+}
+
 export async function leaveRoom(roomCode: string, playerId: string): Promise<void> {
   const room = await getRoom(roomCode)
   if (!room) return
