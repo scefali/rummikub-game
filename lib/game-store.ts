@@ -24,12 +24,27 @@ function roomKey(code: string): string {
 }
 
 async function getRoom(code: string): Promise<Room | null> {
-  const room = await redis.get<Room>(roomKey(code))
-  return room
+  const key = roomKey(code)
+  console.log("[v0] Getting room from Redis:", key)
+  try {
+    const room = await redis.get<Room>(key)
+    console.log("[v0] Redis get result:", room ? "Room found" : "Room not found")
+    return room
+  } catch (err) {
+    console.log("[v0] Redis get error:", err)
+    return null
+  }
 }
 
 async function setRoom(room: Room): Promise<void> {
-  await redis.set(roomKey(room.code), room, { ex: ROOM_TTL })
+  const key = roomKey(room.code)
+  console.log("[v0] Saving room to Redis:", key)
+  try {
+    await redis.set(key, room, { ex: ROOM_TTL })
+    console.log("[v0] Room saved successfully")
+  } catch (err) {
+    console.log("[v0] Redis set error:", err)
+  }
 }
 
 export async function createRoom(

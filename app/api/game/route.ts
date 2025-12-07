@@ -6,14 +6,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action, roomCode, playerId, playerName, melds, hand } = body
 
+    console.log("[v0] API Request:", { action, roomCode, playerName, playerId: playerId?.slice(0, 8) })
+
     switch (action) {
       case "create_room": {
         const result = await gameStore.createRoom(playerName)
+        console.log("[v0] Room created:", { roomCode: result.roomCode, playerId: result.playerId?.slice(0, 8) })
         return NextResponse.json(result)
       }
 
       case "join_room": {
+        console.log("[v0] Attempting to join room:", roomCode)
         const result = await gameStore.joinRoom(roomCode, playerName)
+        console.log("[v0] Join result:", { success: result.success, error: result.error })
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
@@ -23,6 +28,7 @@ export async function POST(request: NextRequest) {
       case "get_state": {
         const gameState = await gameStore.getGameState(roomCode, playerId)
         if (!gameState) {
+          console.log("[v0] Room not found for get_state:", roomCode)
           return NextResponse.json({ error: "Room not found" }, { status: 404 })
         }
         return NextResponse.json({ gameState })
@@ -68,7 +74,8 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 })
     }
-  } catch {
+  } catch (err) {
+    console.log("[v0] API Error:", err)
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 }
