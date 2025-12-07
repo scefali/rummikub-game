@@ -328,7 +328,7 @@ export function PlayerController({
       )}
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="h-[35%] min-h-32 overflow-auto p-3 border-b border-border/30">
+        <div className="flex-1 min-h-32 overflow-auto p-3 border-b border-border/30">
           <div className="flex items-center gap-2 mb-2">
             <Layers className="w-4 h-4 text-muted-foreground" />
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -405,7 +405,7 @@ export function PlayerController({
           )}
         </div>
 
-        <div className="flex-1 min-h-0 bg-card/50 p-3 flex flex-col">
+        <div className="flex-shrink-0 bg-card/50 p-3 border-t border-border/30">
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={() => setHandExpanded(!handExpanded)}
@@ -443,9 +443,9 @@ export function PlayerController({
           </div>
 
           {handExpanded && (
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <>
               {!myPlayer?.hasInitialMeld && (
-                <div className="flex-shrink-0 mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
+                <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
                   <p className="text-xs text-foreground">
                     First move: melds totaling <strong>30+ pts</strong> from your hand only
                     {totalNewPoints > 0 && (
@@ -455,7 +455,7 @@ export function PlayerController({
                 </div>
               )}
 
-              <div className="flex-1 min-h-0 overflow-y-auto pb-2">
+              <div className="max-h-40 overflow-y-auto">
                 <div className="flex flex-wrap gap-1.5 content-start">
                   {sortedHand.map((tile) => (
                     <GameTile
@@ -470,7 +470,7 @@ export function PlayerController({
                   {sortedHand.length === 0 && <p className="text-muted-foreground text-sm py-2">No tiles in hand</p>}
                 </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
