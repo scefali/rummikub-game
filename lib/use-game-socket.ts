@@ -143,7 +143,7 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
   }, [state.roomCode, state.playerId, apiCall])
 
   const playTiles = useCallback(
-    async (melds: Meld[], hand: Tile[]) => {
+    async (melds: Meld[], hand: Tile[], workingArea: Tile[] = []) => {
       if (!state.roomCode || !state.playerId) return
       try {
         await apiCall({
@@ -152,6 +152,7 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
           playerId: state.playerId,
           melds,
           hand,
+          workingArea,
         })
         // Immediately poll for updated state
         pollGameState()

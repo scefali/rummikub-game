@@ -99,9 +99,9 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
   }, [roomCode, playerId, apiCall, pollGameState])
 
   const playTiles = useCallback(
-    async (melds: Meld[], hand: Tile[]) => {
+    async (melds: Meld[], hand: Tile[], workingArea: Tile[] = []) => {
       try {
-        await apiCall({ action: "play_tiles", roomCode, playerId, melds, hand })
+        await apiCall({ action: "play_tiles", roomCode, playerId, melds, hand, workingArea })
         pollGameState()
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to play tiles")

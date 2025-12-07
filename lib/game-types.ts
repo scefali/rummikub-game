@@ -7,6 +7,8 @@ export interface Tile {
   color: TileColor
   number: number // 1-13, or 0 for joker
   isJoker: boolean
+  assignedNumber?: number // The number this joker represents in a meld
+  assignedColor?: TileColor // The color this joker represents in a meld (for sets)
 }
 
 // A meld is a valid group of tiles on the table
@@ -38,6 +40,7 @@ export interface GameState {
   winner: string | null
   turnStartMelds: Meld[] // Snapshot at turn start for validation
   turnStartHand: Tile[] // Snapshot of hand at turn start
+  workingArea: Tile[] // Tiles taken from board being rearranged
 }
 
 // Room state

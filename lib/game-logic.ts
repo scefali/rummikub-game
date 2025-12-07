@@ -78,7 +78,87 @@ export function initializeGame(playerIds: { id: string; name: string; isHost: bo
     winner: null,
     turnStartMelds: [],
     turnStartHand: [],
+    workingArea: [],
   }
+}
+
+function assignJokerValuesInRun(tiles: Tile[]): Tile[] {
+  const nonJokers = tiles.filter((t) => !t.isJoker)
+  if (nonJokers.length === 0) return tiles
+
+  const targetColor = nonJokers[0].color
+  const numbers = nonJokers.map((t) => t.number).sort((a, b) => a - b)
+
+  // Find the minimum starting point considering jokers can extend the run
+  const jokerCount = tiles.filter((t) => t.isJoker).length
+  const minNum = Math.max(1, numbers[0] - jokerCount)
+  const maxNum = Math.min(13, numbers[numbers.length - 1] + jokerCount)
+
+  // Try to find a valid sequence
+  for (let start = minNum; start <= numbers[0]; start++) {
+    const sequence: Tile[] = []
+    let jokerIdx = 0
+    const jokers = tiles.filter((t) => t.isJoker)
+    let numIdx = 0
+    let valid = true
+
+    for (let num = start; num < start + tiles.length && num <= 13; num++) {
+      if (numIdx < numbers.length && numbers[numIdx] === num) {
+        sequence.push(nonJokers.find((t) => t.number === num && !sequence.includes(t))!)
+        numIdx++
+      } else if (jokerIdx < jokers.length) {
+        // Assign this number to the joker
+        sequence.push({
+          ...jokers[jokerIdx],
+          assignedNumber: num,
+          assignedColor: targetColor,
+        })
+        jokerIdx++
+      } else {
+        valid = false
+        break
+      }
+    }
+
+    if (valid && sequence.length === tiles.length && numIdx === nonJokers.length && jokerIdx === jokers.length) {
+      return sequence
+    }
+  }
+
+  // Fallback: return original order
+  return tiles
+}
+
+function assignJokerValuesInSet(tiles: Tile[]): Tile[] {
+  const nonJokers = tiles.filter((t) => !t.isJoker)
+  if (nonJokers.length === 0) return tiles
+
+  const targetNumber = nonJokers[0].number
+  const usedColors = new Set(nonJokers.map((t) => t.color))
+  const availableColors: TileColor[] = ["red", "blue", "yellow", "black"].filter(
+    (c) => !usedColors.has(c as TileColor),
+  ) as TileColor[]
+
+  let colorIdx = 0
+  return tiles.map((tile) => {
+    if (tile.isJoker && colorIdx < availableColors.length) {
+      return {
+        ...tile,
+        assignedNumber: targetNumber,
+        assignedColor: availableColors[colorIdx++],
+      }
+    }
+    return tile
+  })
+}
+
+export function processMeld(meld: Meld): Meld {
+  if (isValidRun(meld.tiles)) {
+    return { ...meld, tiles: assignJokerValuesInRun(meld.tiles) }
+  } else if (isValidSet(meld.tiles)) {
+    return { ...meld, tiles: assignJokerValuesInSet(meld.tiles) }
+  }
+  return meld
 }
 
 // Check if a meld is a valid set (same number, different colors)
@@ -168,7 +248,13 @@ export function canEndTurn(
   melds: Meld[],
   turnStartHand: Tile[],
   turnStartMelds: Meld[],
+  workingArea: Tile[] = [],
 ): { valid: boolean; reason?: string } {
+  // Working area must be empty - all tiles must be placed in melds
+  if (workingArea.length > 0) {
+    return { valid: false, reason: "All tiles in the working area must be placed in melds" }
+  }
+
   // All melds must be valid
   if (!validateAllMelds(melds)) {
     return { valid: false, reason: "Some melds on the table are invalid" }

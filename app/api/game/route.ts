@@ -4,7 +4,7 @@ import * as gameStore from "@/lib/game-store"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, roomCode, playerId, playerName, melds, hand } = body
+    const { action, roomCode, playerId, playerName, melds, hand, workingArea } = body
 
     console.log("[v0] API Request:", { action, roomCode, playerName, playerId: playerId?.slice(0, 8) })
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       }
 
       case "play_tiles": {
-        const result = await gameStore.playTiles(roomCode, playerId, melds, hand)
+        const result = await gameStore.playTiles(roomCode, playerId, melds, hand, workingArea || [])
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }

@@ -171,3 +171,21 @@
 .shake {
   animation: shake 0.3s ease-out;
 }
+
+/* Added safe area padding for mobile devices with notches */
+.safe-area-pb {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* Improved touch targets for mobile */
+@media (pointer: coarse) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Better scrolling on mobile */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+}

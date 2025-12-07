@@ -73,6 +73,7 @@ export async function createRoom(
       winner: null,
       turnStartMelds: [],
       turnStartHand: [],
+      workingArea: [],
     },
     createdAt: Date.now(),
   }
@@ -170,6 +171,7 @@ export async function playTiles(
   playerId: string,
   melds: Meld[],
   hand: Tile[],
+  workingArea: Tile[] = [],
 ): Promise<{ success: boolean; error?: string }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -183,6 +185,7 @@ export async function playTiles(
 
   room.gameState.melds = melds
   currentPlayer.hand = hand
+  room.gameState.workingArea = workingArea
   await setRoom(room)
 
   return { success: true }
@@ -205,6 +208,7 @@ export async function handleDrawTile(
   // Revert any changes made during the turn
   room.gameState.melds = JSON.parse(JSON.stringify(room.gameState.turnStartMelds))
   currentPlayer.hand = [...room.gameState.turnStartHand]
+  room.gameState.workingArea = []
 
   const tile = drawTile(room.gameState)
   if (tile) {
@@ -241,6 +245,7 @@ export async function handleEndTurn(
     room.gameState.melds,
     room.gameState.turnStartHand,
     room.gameState.turnStartMelds,
+    room.gameState.workingArea,
   )
 
   if (!validation.valid) {
@@ -263,6 +268,7 @@ export async function handleEndTurn(
   const nextPlayerObj = room.gameState.players[room.gameState.currentPlayerIndex]
   room.gameState.turnStartHand = [...nextPlayerObj.hand]
   room.gameState.turnStartMelds = JSON.parse(JSON.stringify(room.gameState.melds))
+  room.gameState.workingArea = []
 
   await setRoom(room)
 
