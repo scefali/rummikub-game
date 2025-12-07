@@ -163,17 +163,18 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     [state.roomCode, state.playerId, apiCall, pollGameState],
   )
 
-  const drawTile = useCallback(async () => {
-    if (!state.roomCode || !state.playerId) return
+  const drawTile = useCallback(async (): Promise<Tile | null> => {
+    if (!state.roomCode || !state.playerId) return null
     try {
-      await apiCall({
+      const data = await apiCall({
         action: "draw_tile",
         roomCode: state.roomCode,
         playerId: state.playerId,
       })
       pollGameState()
+      return data.drawnTile || null
     } catch {
-      // Error handled in apiCall
+      return null
     }
   }, [state.roomCode, state.playerId, apiCall, pollGameState])
 
@@ -196,6 +197,20 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     try {
       await apiCall({
         action: "reset_turn",
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+      })
+      pollGameState()
+    } catch {
+      // Error handled in apiCall
+    }
+  }, [state.roomCode, state.playerId, apiCall, pollGameState])
+
+  const reshuffleBoard = useCallback(async () => {
+    if (!state.roomCode || !state.playerId) return
+    try {
+      await apiCall({
+        action: "reshuffle",
         roomCode: state.roomCode,
         playerId: state.playerId,
       })
@@ -240,7 +255,8 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     playTiles,
     drawTile,
     endTurn,
-    resetTurn, // Export resetTurn
+    resetTurn,
+    reshuffleBoard, // Export reshuffleBoard
     disconnect,
   }
 }

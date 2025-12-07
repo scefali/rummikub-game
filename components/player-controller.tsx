@@ -4,10 +4,24 @@ import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Hand, Layers, Plus, X, Download, Send, AlertCircle, Users, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
+import {
+  Hand,
+  Layers,
+  Plus,
+  X,
+  Download,
+  Send,
+  AlertCircle,
+  Users,
+  Wrench,
+  ArrowLeft,
+  RotateCcw,
+  Shuffle,
+} from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
+import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { generateId, isValidMeld, calculateMeldPoints } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -16,9 +30,10 @@ interface PlayerControllerProps {
   playerId: string
   roomCode: string
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
-  onDrawTile: () => void
+  onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
+  onReshuffle: () => void
   error?: string | null
 }
 
@@ -30,11 +45,13 @@ export function PlayerController({
   onDrawTile,
   onEndTurn,
   onResetTurn,
+  onReshuffle,
   error,
 }: PlayerControllerProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
   const [showPlayers, setShowPlayers] = useState(false)
+  const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -211,8 +228,11 @@ export function PlayerController({
     setSelectedWorkingTiles(new Set())
   }, [])
 
-  const handleDrawTile = useCallback(() => {
-    onDrawTile()
+  const handleDrawTile = useCallback(async () => {
+    const tile = await onDrawTile()
+    if (tile) {
+      setDrawnTile(tile)
+    }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
   }, [onDrawTile])
@@ -235,6 +255,8 @@ export function PlayerController({
 
   return (
     <div className="h-dvh flex flex-col bg-background overflow-hidden">
+      <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
+
       {/* Header */}
       <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50">
         <div className="flex items-center gap-2">
@@ -468,7 +490,7 @@ export function PlayerController({
 
       {isMyTurn && (
         <div className="flex-shrink-0 p-3 border-t border-border/50 bg-card/80 safe-area-pb">
-          <div className="flex justify-center mb-2">
+          <div className="flex justify-center gap-4 mb-2">
             <Button
               variant="ghost"
               size="sm"
@@ -478,6 +500,17 @@ export function PlayerController({
               <RotateCcw className="w-3.5 h-3.5" />
               Reset Move
             </Button>
+            {canUseTableTiles && gameState.melds.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={onReshuffle}
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+                Reshuffle Table
+              </Button>
+            )}
           </div>
           <div className="flex gap-2">
             <Button

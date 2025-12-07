@@ -326,3 +326,174 @@ export function checkGameEnd(gameState: GameState): { ended: boolean; winner?: s
 
   return { ended: false }
 }
+
+export function reshuffleTable(
+  melds: Meld[],
+  workingArea: Tile[] = [],
+): { success: boolean; newMelds: Meld[]; remainingTiles: Tile[] } {
+  // Collect all tiles from melds and working area
+  const allTiles: Tile[] = [...melds.flatMap((m) => m.tiles), ...workingArea]
+
+  if (allTiles.length === 0) {
+    return { success: true, newMelds: [], remainingTiles: [] }
+  }
+
+  // Try to find a valid arrangement of all tiles
+  const result = findValidArrangement(allTiles)
+
+  if (result.success) {
+    return {
+      success: true,
+      newMelds: result.melds,
+      remainingTiles: result.remainingTiles,
+    }
+  }
+
+  return { success: false, newMelds: melds, remainingTiles: workingArea }
+}
+
+// Recursive backtracking algorithm to find valid meld arrangements
+function findValidArrangement(tiles: Tile[]): { success: boolean; melds: Meld[]; remainingTiles: Tile[] } {
+  // Shuffle tiles for randomness in solutions
+  const shuffledTiles = shuffle([...tiles])
+
+  // Try to find all possible melds
+  const possibleMelds = findAllPossibleMelds(shuffledTiles)
+
+  // Shuffle possible melds for variety
+  const shuffledMelds = shuffle(possibleMelds)
+
+  // Use backtracking to find a combination that uses all tiles
+  const result = backtrackMelds(shuffledTiles, shuffledMelds, [])
+
+  if (result.success) {
+    return result
+  }
+
+  // If we can't use all tiles, return the best we found
+  return { success: false, melds: [], remainingTiles: tiles }
+}
+
+function findAllPossibleMelds(tiles: Tile[]): Meld[] {
+  const melds: Meld[] = []
+  const tilesByColor: Record<TileColor, Tile[]> = {
+    red: [],
+    blue: [],
+    yellow: [],
+    black: [],
+  }
+  const tilesByNumber: Record<number, Tile[]> = {}
+  const jokers = tiles.filter((t) => t.isJoker)
+
+  // Group tiles
+  for (const tile of tiles) {
+    if (!tile.isJoker) {
+      tilesByColor[tile.color].push(tile)
+      if (!tilesByNumber[tile.number]) {
+        tilesByNumber[tile.number] = []
+      }
+      tilesByNumber[tile.number].push(tile)
+    }
+  }
+
+  // Find all possible runs (consecutive numbers, same color)
+  for (const color of ["red", "blue", "yellow", "black"] as TileColor[]) {
+    const colorTiles = tilesByColor[color].sort((a, b) => a.number - b.number)
+
+    // Try runs of different lengths starting at different positions
+    for (let start = 0; start < colorTiles.length; start++) {
+      for (let len = 3; len <= Math.min(13, colorTiles.length - start + jokers.length); len++) {
+        const runTiles: Tile[] = []
+        let numIndex = start
+        let jokersUsed = 0
+        let currentNum = colorTiles[start]?.number || 1
+
+        for (let i = 0; i < len && currentNum <= 13; i++) {
+          if (numIndex < colorTiles.length && colorTiles[numIndex].number === currentNum) {
+            runTiles.push(colorTiles[numIndex])
+            numIndex++
+          } else if (jokersUsed < jokers.length) {
+            runTiles.push(jokers[jokersUsed])
+            jokersUsed++
+          } else {
+            break
+          }
+          currentNum++
+        }
+
+        if (runTiles.length >= 3 && isValidRun(runTiles)) {
+          melds.push({ id: generateId(), tiles: [...runTiles] })
+        }
+      }
+    }
+  }
+
+  // Find all possible sets (same number, different colors)
+  for (const num in tilesByNumber) {
+    const numTiles = tilesByNumber[num]
+    const uniqueColorTiles: Tile[] = []
+    const seenColors = new Set<TileColor>()
+
+    for (const tile of numTiles) {
+      if (!seenColors.has(tile.color)) {
+        seenColors.add(tile.color)
+        uniqueColorTiles.push(tile)
+      }
+    }
+
+    // Sets of 3 or 4 tiles
+    if (uniqueColorTiles.length >= 3) {
+      melds.push({ id: generateId(), tiles: uniqueColorTiles.slice(0, 3) })
+    }
+    if (uniqueColorTiles.length >= 4) {
+      melds.push({ id: generateId(), tiles: uniqueColorTiles.slice(0, 4) })
+    }
+
+    // With jokers
+    if (uniqueColorTiles.length >= 2 && jokers.length > 0) {
+      melds.push({ id: generateId(), tiles: [...uniqueColorTiles.slice(0, 2), jokers[0]] })
+    }
+  }
+
+  return melds
+}
+
+function backtrackMelds(
+  remainingTiles: Tile[],
+  possibleMelds: Meld[],
+  currentMelds: Meld[],
+): { success: boolean; melds: Meld[]; remainingTiles: Tile[] } {
+  // If no tiles remaining, we found a valid solution
+  if (remainingTiles.length === 0) {
+    return { success: true, melds: currentMelds, remainingTiles: [] }
+  }
+
+  // Try each possible meld
+  for (const meld of possibleMelds) {
+    // Check if all tiles in this meld are still available
+    const meldTileIds = new Set(meld.tiles.map((t) => t.id))
+    const canUseMeld = meld.tiles.every((t) => remainingTiles.some((rt) => rt.id === t.id))
+
+    if (canUseMeld) {
+      // Remove these tiles from remaining
+      const newRemaining = remainingTiles.filter((t) => !meldTileIds.has(t.id))
+
+      // Filter out melds that use any of the tiles we just used
+      const newPossible = possibleMelds.filter((m) => !m.tiles.some((t) => meldTileIds.has(t.id)))
+
+      // Create new meld with fresh ID
+      const newMeld: Meld = { id: generateId(), tiles: meld.tiles }
+
+      // Recurse
+      const result = backtrackMelds(newRemaining, newPossible, [...currentMelds, newMeld])
+
+      if (result.success) {
+        return result
+      }
+    }
+  }
+
+  // No valid arrangement found with current tiles
+  // Return best effort - melds we have so far
+  return { success: false, melds: currentMelds, remainingTiles }
+}

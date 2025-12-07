@@ -4,10 +4,11 @@ import { useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
+import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, Shuffle } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
+import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { generateId, isValidMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -16,9 +17,10 @@ interface GameBoardProps {
   playerId: string
   roomCode: string
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
-  onDrawTile: () => void
+  onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
+  onReshuffle: () => void
   error?: string | null
 }
 
@@ -30,10 +32,12 @@ export function GameBoard({
   onDrawTile,
   onEndTurn,
   onResetTurn,
+  onReshuffle,
   error,
 }: GameBoardProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
+  const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -191,6 +195,15 @@ export function GameBoard({
     setSelectedWorkingTiles(new Set())
   }, [])
 
+  const handleDrawTile = useCallback(async () => {
+    const tile = await onDrawTile()
+    if (tile) {
+      setDrawnTile(tile)
+    }
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+  }, [onDrawTile])
+
   const handleResetTurn = useCallback(() => {
     onResetTurn()
     setSelectedTiles(new Set())
@@ -202,6 +215,8 @@ export function GameBoard({
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
+
       {/* Header */}
       <header className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50">
         <div className="flex items-center gap-4">
@@ -259,14 +274,27 @@ export function GameBoard({
       <div className="flex-1 flex">
         {/* Table / Melds Area */}
         <div className="flex-1 p-6 overflow-auto">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground mb-2">Table</h2>
-            <p className="text-sm text-muted-foreground">
-              {gameState.melds.length === 0
-                ? "No melds on the table yet"
-                : `${gameState.melds.length} meld${gameState.melds.length > 1 ? "s" : ""} on table`}
-              {canUseTableTiles && isMyTurn && " - Click tiles to rearrange"}
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground mb-1">Table</h2>
+              <p className="text-sm text-muted-foreground">
+                {gameState.melds.length === 0
+                  ? "No melds on the table yet"
+                  : `${gameState.melds.length} meld${gameState.melds.length > 1 ? "s" : ""} on table`}
+                {canUseTableTiles && isMyTurn && " - Click tiles to rearrange"}
+              </p>
+            </div>
+            {isMyTurn && canUseTableTiles && gameState.melds.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onReshuffle}
+                className="gap-2 cursor-pointer hover:bg-secondary/50 bg-transparent"
+              >
+                <Shuffle className="w-4 h-4" />
+                Reshuffle Table
+              </Button>
+            )}
           </div>
 
           {/* Melds Grid */}
@@ -417,15 +445,20 @@ export function GameBoard({
                     variant="ghost"
                     size="sm"
                     onClick={handleResetTurn}
-                    className="gap-1 text-muted-foreground hover:text-foreground"
+                    className="gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Reset
                   </Button>
-                  <Button variant="outline" size="sm" onClick={onDrawTile}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDrawTile}
+                    className="cursor-pointer bg-transparent"
+                  >
                     Draw Tile
                   </Button>
-                  <Button size="sm" onClick={onEndTurn}>
+                  <Button size="sm" onClick={onEndTurn} className="cursor-pointer">
                     End Turn
                   </Button>
                 </>

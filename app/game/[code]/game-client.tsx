@@ -110,12 +110,14 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     [roomCode, playerId, apiCall, pollGameState],
   )
 
-  const drawTile = useCallback(async () => {
+  const drawTile = useCallback(async (): Promise<Tile | null> => {
     try {
-      await apiCall({ action: "draw_tile", roomCode, playerId })
+      const data = await apiCall({ action: "draw_tile", roomCode, playerId })
       pollGameState()
+      return data.drawnTile || null
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to draw tile")
+      return null
     }
   }, [roomCode, playerId, apiCall, pollGameState])
 
@@ -134,6 +136,15 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       pollGameState()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset turn")
+    }
+  }, [roomCode, playerId, apiCall, pollGameState])
+
+  const reshuffleBoard = useCallback(async () => {
+    try {
+      await apiCall({ action: "reshuffle", roomCode, playerId })
+      pollGameState()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reshuffle table")
     }
   }, [roomCode, playerId, apiCall, pollGameState])
 
@@ -193,7 +204,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     )
   }
 
-  // Game in progress
+  // Game in progress - Pass onReshuffle to both views
   if (isMobile || !isHost) {
     return (
       <PlayerController
@@ -204,6 +215,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         onDrawTile={drawTile}
         onEndTurn={endTurn}
         onResetTurn={resetTurn}
+        onReshuffle={reshuffleBoard}
         error={error}
       />
     )
@@ -218,6 +230,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       onDrawTile={drawTile}
       onEndTurn={endTurn}
       onResetTurn={resetTurn}
+      onReshuffle={reshuffleBoard}
       error={error}
     />
   )
