@@ -35,18 +35,20 @@ export function DrawnTileModal({ tile, onClose }: DrawnTileModalProps) {
     }
   }, [tile, onClose])
 
+  const handleDismiss = () => {
+    setIsLeaving(true)
+    setTimeout(onClose, 300)
+  }
+
   if (!tile) return null
 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-300",
+        "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-300 cursor-pointer",
         isVisible && !isLeaving ? "opacity-100" : "opacity-0",
       )}
-      onClick={() => {
-        setIsLeaving(true)
-        setTimeout(onClose, 300)
-      }}
+      onClick={handleDismiss}
     >
       <div
         className={cn(
@@ -55,10 +57,13 @@ export function DrawnTileModal({ tile, onClose }: DrawnTileModalProps) {
         )}
       >
         <p className="text-lg font-semibold text-white">You drew:</p>
-        <div className="transform scale-[2.5] my-8">
+        <button
+          className="transform scale-[2.5] my-8 cursor-pointer transition-transform hover:scale-[2.7] active:scale-[2.3]"
+          onClick={handleDismiss}
+        >
           <GameTile tile={tile} size="lg" />
-        </div>
-        <p className="text-sm text-white/70">Tap anywhere to continue</p>
+        </button>
+        <p className="text-sm text-white/70">Tap tile or anywhere to continue</p>
       </div>
     </div>
   )

@@ -22,7 +22,7 @@ import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
-import { generateId, isValidMeld, calculateMeldPoints } from "@/lib/game-logic"
+import { generateId, isValidMeld, calculateMeldPoints, canReshuffleTable } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface PlayerControllerProps {
@@ -252,6 +252,8 @@ export function PlayerController({
     .reduce((sum, m) => sum + calculateMeldPoints(m.tiles), 0)
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
+
+  const canReshuffle = canUseTableTiles && canReshuffleTable(gameState.melds, workingArea)
 
   return (
     <div className="h-dvh flex flex-col bg-background overflow-hidden">
@@ -500,12 +502,14 @@ export function PlayerController({
               <RotateCcw className="w-3.5 h-3.5" />
               Reset Move
             </Button>
-            {canUseTableTiles && gameState.melds.length > 0 && (
+            {canUseTableTiles && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 onClick={onReshuffle}
+                disabled={!canReshuffle}
+                title={!canReshuffle ? "No alternative arrangement available" : "Find another valid arrangement"}
               >
                 <Shuffle className="w-3.5 h-3.5" />
                 Reshuffle Table

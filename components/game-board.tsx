@@ -9,7 +9,7 @@ import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
-import { generateId, isValidMeld } from "@/lib/game-logic"
+import { generateId, isValidMeld, canReshuffleTable } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface GameBoardProps {
@@ -212,6 +212,7 @@ export function GameBoard({
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
+  const canReshuffle = canUseTableTiles && canReshuffleTable(gameState.melds, workingArea)
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -289,7 +290,9 @@ export function GameBoard({
                 variant="outline"
                 size="sm"
                 onClick={onReshuffle}
-                className="gap-2 cursor-pointer hover:bg-secondary/50 bg-transparent"
+                disabled={!canReshuffle}
+                className="gap-2 cursor-pointer hover:bg-secondary/50 bg-transparent disabled:opacity-40 disabled:cursor-not-allowed"
+                title={!canReshuffle ? "No alternative arrangement available" : "Find another valid arrangement"}
               >
                 <Shuffle className="w-4 h-4" />
                 Reshuffle Table

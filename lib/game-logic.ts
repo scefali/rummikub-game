@@ -327,6 +327,28 @@ export function checkGameEnd(gameState: GameState): { ended: boolean; winner?: s
   return { ended: false }
 }
 
+export function canReshuffleTable(melds: Meld[], workingArea: Tile[] = []): boolean {
+  const allTiles: Tile[] = [...melds.flatMap((m) => m.tiles), ...workingArea]
+
+  // Nothing to reshuffle
+  if (allTiles.length === 0) return false
+
+  // Need at least 3 tiles to form any meld
+  if (allTiles.length < 3) return false
+
+  // If we have working area tiles, reshuffle might help place them
+  if (workingArea.length > 0) {
+    // Try to find a valid arrangement
+    const result = findValidArrangement(allTiles)
+    return result.success && result.remainingTiles.length === 0
+  }
+
+  // If all tiles are already in valid melds, check if alternative arrangement exists
+  // For simplicity, allow reshuffle if there are multiple melds (rearrangement possible)
+  return melds.length >= 2 || melds.some((m) => m.tiles.length > 3)
+}
+
+// Reshuffle table to find a valid arrangement
 export function reshuffleTable(
   melds: Meld[],
   workingArea: Tile[] = [],
