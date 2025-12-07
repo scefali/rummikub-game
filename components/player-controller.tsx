@@ -4,7 +4,21 @@ import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Hand, Layers, Plus, X, Download, Send, AlertCircle, Users, Wrench, ArrowLeft, RotateCcw } from "lucide-react"
+import {
+  Hand,
+  Layers,
+  Plus,
+  X,
+  Download,
+  Send,
+  AlertCircle,
+  Users,
+  Wrench,
+  ArrowLeft,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
@@ -37,6 +51,7 @@ export function PlayerController({
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
   const [showPlayers, setShowPlayers] = useState(false)
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
+  const [handExpanded, setHandExpanded] = useState(true)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -401,12 +416,20 @@ export function PlayerController({
 
         <div className="flex-shrink-0 bg-card/50 p-3">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => setHandExpanded(!handExpanded)}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <Hand className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Your Hand ({myHand.length})
               </h3>
-            </div>
+              {handExpanded ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
 
             {totalSelected > 0 && isMyTurn && (
               <div className="flex items-center gap-2">
@@ -428,30 +451,36 @@ export function PlayerController({
             )}
           </div>
 
-          {!myPlayer?.hasInitialMeld && (
-            <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
-              <p className="text-xs text-foreground">
-                First move: melds totaling <strong>30+ pts</strong> from your hand only
-                {totalNewPoints > 0 && <span className="ml-2 text-primary font-semibold">({totalNewPoints} pts)</span>}
-              </p>
-            </div>
+          {handExpanded && (
+            <>
+              {!myPlayer?.hasInitialMeld && (
+                <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
+                  <p className="text-xs text-foreground">
+                    First move: melds totaling <strong>30+ pts</strong> from your hand only
+                    {totalNewPoints > 0 && (
+                      <span className="ml-2 text-primary font-semibold">({totalNewPoints} pts)</span>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              <div className="max-h-48 overflow-y-auto pb-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {sortedHand.map((tile) => (
+                    <GameTile
+                      key={tile.id}
+                      tile={tile}
+                      size="md"
+                      selected={selectedTiles.has(tile.id)}
+                      onClick={isMyTurn ? () => toggleTileSelection(tile.id) : undefined}
+                    />
+                  ))}
+
+                  {sortedHand.length === 0 && <p className="text-muted-foreground text-sm py-2">No tiles in hand</p>}
+                </div>
+              </div>
+            </>
           )}
-
-          <div className="max-h-48 overflow-y-auto pb-2">
-            <div className="flex flex-wrap gap-1.5">
-              {sortedHand.map((tile) => (
-                <GameTile
-                  key={tile.id}
-                  tile={tile}
-                  size="md"
-                  selected={selectedTiles.has(tile.id)}
-                  onClick={isMyTurn ? () => toggleTileSelection(tile.id) : undefined}
-                />
-              ))}
-
-              {sortedHand.length === 0 && <p className="text-muted-foreground text-sm py-2">No tiles in hand</p>}
-            </div>
-          </div>
         </div>
       </div>
 
