@@ -24,158 +24,190 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
     error: null,
   })
 
-  const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const isPollingRef = useRef(false)
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
-
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/socket`)
-
-    ws.onopen = () => {
-      console.log("[v0] WebSocket connected")
-      setState((prev) => ({ ...prev, isConnected: true, error: null }))
-    }
-
-    ws.onmessage = (event) => {
+  // API call helper
+  const apiCall = useCallback(
+    async (body: Record<string, unknown>) => {
       try {
-        const message = JSON.parse(event.data)
-        handleMessage(message)
-      } catch {
-        console.error("[v0] Failed to parse message")
-      }
-    }
-
-    ws.onclose = () => {
-      console.log("[v0] WebSocket disconnected")
-      setState((prev) => ({ ...prev, isConnected: false }))
-
-      // Attempt to reconnect after 2 seconds
-      reconnectTimeoutRef.current = setTimeout(() => {
-        if (state.roomCode) {
-          connect()
+        const response = await fetch("/api/game", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || "Request failed")
         }
-      }, 2000)
-    }
-
-    ws.onerror = () => {
-      setState((prev) => ({ ...prev, error: "Connection error" }))
-    }
-
-    wsRef.current = ws
-  }, [state.roomCode])
-
-  const handleMessage = useCallback(
-    (message: { type: string; payload?: Record<string, unknown> }) => {
-      switch (message.type) {
-        case "room_created":
-        case "room_joined":
-          setState((prev) => ({
-            ...prev,
-            roomCode: message.payload?.roomCode as string,
-            playerId: message.payload?.playerId as string,
-            gameState: message.payload?.gameState as GameState,
-          }))
-          break
-
-        case "player_joined":
-        case "player_left":
-        case "game_started":
-        case "game_state_update":
-          setState((prev) => ({
-            ...prev,
-            gameState: message.payload?.gameState as GameState,
-          }))
-          break
-
-        case "game_ended":
-          setState((prev) => ({
-            ...prev,
-            gameState: message.payload?.gameState as GameState,
-          }))
-          break
-
-        case "room_not_found":
-          setState((prev) => ({
-            ...prev,
-            error: "Room not found",
-          }))
-          options.onError?.("Room not found")
-          break
-
-        case "error":
-          const errorMsg = (message.payload?.message as string) || "Unknown error"
-          setState((prev) => ({ ...prev, error: errorMsg }))
-          options.onError?.(errorMsg)
-          break
+        return data
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Request failed"
+        options.onError?.(message)
+        throw err
       }
     },
     [options],
   )
 
-  const sendMessage = useCallback((type: string, payload?: unknown) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type, payload }))
-    }
-  }, [])
+  // Poll for game state updates
+  const pollGameState = useCallback(async () => {
+    if (!state.roomCode || !state.playerId || isPollingRef.current) return
 
-  const createRoom = useCallback(
-    (playerName: string) => {
-      connect()
-      // Wait for connection before sending
-      const checkAndSend = () => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          sendMessage("create_room", { playerName })
-        } else {
-          setTimeout(checkAndSend, 100)
+    isPollingRef.current = true
+    try {
+      const data = await apiCall({
+        action: "get_state",
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+      })
+      setState((prev) => ({
+        ...prev,
+        gameState: data.gameState,
+        isConnected: true,
+        error: null,
+      }))
+    } catch {
+      // Silent fail for polling - will retry
+    } finally {
+      isPollingRef.current = false
+    }
+  }, [state.roomCode, state.playerId, apiCall])
+
+  // Start polling when connected to a room
+  useEffect(() => {
+    if (state.roomCode && state.playerId) {
+      // Initial fetch
+      pollGameState()
+
+      // Poll every 1 second
+      pollingRef.current = setInterval(pollGameState, 1000)
+
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
         }
       }
-      checkAndSend()
+    }
+  }, [state.roomCode, state.playerId, pollGameState])
+
+  const createRoom = useCallback(
+    async (playerName: string) => {
+      try {
+        const data = await apiCall({ action: "create_room", playerName })
+        setState({
+          isConnected: true,
+          roomCode: data.roomCode,
+          playerId: data.playerId,
+          gameState: data.gameState,
+          error: null,
+        })
+      } catch {
+        // Error handled in apiCall
+      }
     },
-    [connect, sendMessage],
+    [apiCall],
   )
 
   const joinRoom = useCallback(
-    (roomCode: string, playerName: string) => {
-      connect()
-      const checkAndSend = () => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          sendMessage("join_room", { roomCode, playerName })
-        } else {
-          setTimeout(checkAndSend, 100)
-        }
+    async (roomCode: string, playerName: string) => {
+      try {
+        const data = await apiCall({ action: "join_room", roomCode, playerName })
+        setState({
+          isConnected: true,
+          roomCode: roomCode.toUpperCase(),
+          playerId: data.playerId,
+          gameState: data.gameState,
+          error: null,
+        })
+      } catch {
+        // Error handled in apiCall
       }
-      checkAndSend()
     },
-    [connect, sendMessage],
+    [apiCall],
   )
 
-  const startGame = useCallback(() => {
-    sendMessage("start_game")
-  }, [sendMessage])
+  const startGame = useCallback(async () => {
+    if (!state.roomCode || !state.playerId) return
+    try {
+      await apiCall({
+        action: "start_game",
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+      })
+      // Poll will pick up the new state
+    } catch {
+      // Error handled in apiCall
+    }
+  }, [state.roomCode, state.playerId, apiCall])
 
   const playTiles = useCallback(
-    (melds: Meld[], hand: Tile[]) => {
-      sendMessage("play_tiles", { melds, hand })
+    async (melds: Meld[], hand: Tile[]) => {
+      if (!state.roomCode || !state.playerId) return
+      try {
+        await apiCall({
+          action: "play_tiles",
+          roomCode: state.roomCode,
+          playerId: state.playerId,
+          melds,
+          hand,
+        })
+        // Immediately poll for updated state
+        pollGameState()
+      } catch {
+        // Error handled in apiCall
+      }
     },
-    [sendMessage],
+    [state.roomCode, state.playerId, apiCall, pollGameState],
   )
 
-  const drawTile = useCallback(() => {
-    sendMessage("draw_tile")
-  }, [sendMessage])
-
-  const endTurn = useCallback(() => {
-    sendMessage("end_turn")
-  }, [sendMessage])
-
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
+  const drawTile = useCallback(async () => {
+    if (!state.roomCode || !state.playerId) return
+    try {
+      await apiCall({
+        action: "draw_tile",
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+      })
+      pollGameState()
+    } catch {
+      // Error handled in apiCall
     }
-    wsRef.current?.close()
-    wsRef.current = null
+  }, [state.roomCode, state.playerId, apiCall, pollGameState])
+
+  const endTurn = useCallback(async () => {
+    if (!state.roomCode || !state.playerId) return
+    try {
+      await apiCall({
+        action: "end_turn",
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+      })
+      pollGameState()
+    } catch {
+      // Error handled in apiCall
+    }
+  }, [state.roomCode, state.playerId, apiCall, pollGameState])
+
+  const disconnect = useCallback(async () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
+
+    if (state.roomCode && state.playerId) {
+      try {
+        await apiCall({
+          action: "leave",
+          roomCode: state.roomCode,
+          playerId: state.playerId,
+        })
+      } catch {
+        // Ignore errors on disconnect
+      }
+    }
+
     setState({
       isConnected: false,
       roomCode: null,
@@ -183,16 +215,7 @@ export function useGameSocket(options: UseGameSocketOptions = {}) {
       gameState: null,
       error: null,
     })
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-      }
-      wsRef.current?.close()
-    }
-  }, [])
+  }, [state.roomCode, state.playerId, apiCall])
 
   return {
     ...state,

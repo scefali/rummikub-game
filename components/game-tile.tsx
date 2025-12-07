@@ -39,17 +39,20 @@ export function GameTile({
       draggable={draggable}
       className={cn(
         "flex items-center justify-center rounded-lg font-bold cursor-pointer transition-all",
-        "bg-foreground shadow-md border-2 border-border/50",
+        "bg-tile-bg shadow-md border-2 border-border/30",
         "hover:scale-105 active:scale-95",
         sizeClasses[size],
         selected && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-105",
+        !onClick && "cursor-default hover:scale-100 active:scale-100",
         className,
       )}
     >
       {tile.isJoker ? (
-        <span className="text-primary">J</span>
+        <span className="text-transparent bg-gradient-to-br from-tile-red via-tile-blue to-tile-yellow bg-clip-text font-black">
+          ★
+        </span>
       ) : (
-        <span className={colorClasses[tile.color]}>{tile.number}</span>
+        <span className={cn(colorClasses[tile.color], "font-black")}>{tile.number}</span>
       )}
     </div>
   )

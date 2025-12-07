@@ -1,12 +1,14 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Layers, Users, ArrowRight, AlertCircle } from "lucide-react"
+import { Layers, Users, ArrowRight, AlertCircle, Plus, X } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
-import { PlayerHand } from "@/components/player-hand"
+import { GameTile } from "@/components/game-tile"
+import { generateId, isValidMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface GameBoardProps {
@@ -28,9 +30,108 @@ export function GameBoard({
   onEndTurn,
   error,
 }: GameBoardProps) {
+  const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
+
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
   const isMyTurn = currentPlayer?.id === playerId
+  const myHand = myPlayer?.hand || []
+
+  // Sort tiles
+  const sortedTiles = [...myHand].sort((a, b) => {
+    if (a.isJoker && !b.isJoker) return 1
+    if (!a.isJoker && b.isJoker) return -1
+    if (a.color !== b.color) return a.color.localeCompare(b.color)
+    return a.number - b.number
+  })
+
+  const toggleTileSelection = useCallback((tileId: string) => {
+    setSelectedTiles((prev) => {
+      const next = new Set(prev)
+      if (next.has(tileId)) {
+        next.delete(tileId)
+      } else {
+        next.add(tileId)
+      }
+      return next
+    })
+  }, [])
+
+  const createMeld = useCallback(() => {
+    if (selectedTiles.size < 3) return
+
+    const selectedTileObjects = myHand.filter((t) => selectedTiles.has(t.id))
+    const remainingTiles = myHand.filter((t) => !selectedTiles.has(t.id))
+
+    const newMeld: Meld = {
+      id: generateId(),
+      tiles: selectedTileObjects,
+    }
+
+    const newMelds = [...gameState.melds, newMeld]
+    onPlayTiles(newMelds, remainingTiles)
+    setSelectedTiles(new Set())
+  }, [selectedTiles, myHand, gameState.melds, onPlayTiles])
+
+  const addToMeld = useCallback(
+    (meldId: string) => {
+      if (selectedTiles.size === 0) return
+
+      const selectedTileObjects = myHand.filter((t) => selectedTiles.has(t.id))
+      const remainingTiles = myHand.filter((t) => !selectedTiles.has(t.id))
+
+      const updatedMelds = gameState.melds.map((m) => {
+        if (m.id === meldId) {
+          return { ...m, tiles: [...m.tiles, ...selectedTileObjects] }
+        }
+        return m
+      })
+
+      onPlayTiles(updatedMelds, remainingTiles)
+      setSelectedTiles(new Set())
+    },
+    [selectedTiles, myHand, gameState.melds, onPlayTiles],
+  )
+
+  const removeTileFromMeld = useCallback(
+    (tileId: string, meldId: string) => {
+      const meld = gameState.melds.find((m) => m.id === meldId)
+      if (!meld) return
+
+      const tile = meld.tiles.find((t) => t.id === tileId)
+      if (!tile) return
+
+      const updatedMelds = gameState.melds
+        .map((m) => {
+          if (m.id === meldId) {
+            return { ...m, tiles: m.tiles.filter((t) => t.id !== tileId) }
+          }
+          return m
+        })
+        .filter((m) => m.tiles.length > 0)
+
+      onPlayTiles(updatedMelds, [...myHand, tile])
+    },
+    [gameState.melds, myHand, onPlayTiles],
+  )
+
+  const deleteMeld = useCallback(
+    (meldId: string) => {
+      const meld = gameState.melds.find((m) => m.id === meldId)
+      if (!meld) return
+
+      const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
+      onPlayTiles(updatedMelds, [...myHand, ...meld.tiles])
+    },
+    [gameState.melds, myHand, onPlayTiles],
+  )
+
+  const clearSelection = useCallback(() => {
+    setSelectedTiles(new Set())
+  }, [])
+
+  const selectedTileObjects = myHand.filter((t) => selectedTiles.has(t.id))
+  const wouldBeValidMeld = selectedTiles.size >= 3 && isValidMeld({ id: "temp", tiles: selectedTileObjects })
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -102,7 +203,15 @@ export function GameBoard({
           {/* Melds Grid */}
           <div className="flex flex-wrap gap-4">
             {gameState.melds.map((meld) => (
-              <MeldDisplay key={meld.id} meld={meld} />
+              <MeldDisplay
+                key={meld.id}
+                meld={meld}
+                isInteractive={isMyTurn}
+                hasSelectedTiles={selectedTiles.size > 0}
+                onTileClick={isMyTurn ? removeTileFromMeld : undefined}
+                onAddTile={isMyTurn ? addToMeld : undefined}
+                onDeleteMeld={isMyTurn ? deleteMeld : undefined}
+              />
             ))}
 
             {gameState.melds.length === 0 && (
@@ -159,13 +268,37 @@ export function GameBoard({
         </div>
       </div>
 
-      {/* My Hand (Host also plays) */}
+      {/* My Hand */}
       {myPlayer && (
         <div className="border-t border-border/50 bg-card/50 p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Hand</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Hand</h3>
+              {!myPlayer.hasInitialMeld && (
+                <Badge variant="outline" className="text-xs">
+                  Need 30+ pts for first meld
+                </Badge>
+              )}
+            </div>
             <div className="flex gap-2">
-              {isMyTurn && (
+              {isMyTurn && selectedTiles.size > 0 && (
+                <>
+                  <Button
+                    variant={wouldBeValidMeld ? "default" : "secondary"}
+                    size="sm"
+                    onClick={createMeld}
+                    disabled={selectedTiles.size < 3}
+                    className="gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {wouldBeValidMeld ? "Create Meld" : `Select ${3 - selectedTiles.size} more`}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={clearSelection}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
+              {isMyTurn && selectedTiles.size === 0 && (
                 <>
                   <Button variant="outline" size="sm" onClick={onDrawTile}>
                     Draw Tile
@@ -177,7 +310,21 @@ export function GameBoard({
               )}
             </div>
           </div>
-          <PlayerHand tiles={myPlayer.hand} isMyTurn={isMyTurn} melds={gameState.melds} onPlayTiles={onPlayTiles} />
+
+          {/* Hand tiles */}
+          <div className="flex flex-wrap gap-2">
+            {sortedTiles.map((tile) => (
+              <GameTile
+                key={tile.id}
+                tile={tile}
+                size="md"
+                selected={selectedTiles.has(tile.id)}
+                onClick={isMyTurn ? () => toggleTileSelection(tile.id) : undefined}
+              />
+            ))}
+
+            {sortedTiles.length === 0 && <p className="text-muted-foreground text-sm py-4">No tiles in hand</p>}
+          </div>
         </div>
       )}
     </div>
