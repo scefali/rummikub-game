@@ -202,10 +202,15 @@ export async function startGame(
     isHost: p.isHost,
     playerCode: p.playerCode,
     email: p.email,
+    hasInitialMeld: false,
   }))
 
   const rules = getRulesForPlayerCount(playerData.length)
   room.gameState = initializeGame(playerData, rules)
+
+  room.gameState.players.forEach((p) => {
+    p.hasInitialMeld = false
+  })
 
   const currentPlayer = room.gameState.players[0]
   room.gameState.turnStartHand = [...currentPlayer.hand]

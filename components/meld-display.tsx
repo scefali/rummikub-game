@@ -17,6 +17,7 @@ interface MeldDisplayProps {
   isInteractive?: boolean
   hasSelectedTiles?: boolean
   compact?: boolean
+  newTileIds?: Set<string>
 }
 
 export function MeldDisplay({
@@ -27,6 +28,7 @@ export function MeldDisplay({
   isInteractive = false,
   hasSelectedTiles = false,
   compact = false,
+  newTileIds,
 }: MeldDisplayProps) {
   const isValid = isValidMeld(meld)
   const processedMeld = isValid ? processMeld(meld) : meld
@@ -43,15 +45,25 @@ export function MeldDisplay({
     >
       {/* Tiles row */}
       <div className="flex gap-0.5">
-        {processedMeld.tiles.map((tile) => (
-          <GameTile
-            key={tile.id}
-            tile={tile}
-            size={compact ? "sm" : "md"}
-            onClick={isInteractive ? () => onTileClick?.(tile.id, meld.id) : undefined}
-            showAssigned={tile.isJoker && isValid}
-          />
-        ))}
+        {processedMeld.tiles.map((tile) => {
+          const isNewTile = newTileIds?.has(tile.id)
+          return (
+            <div key={tile.id} className="relative">
+              <GameTile
+                tile={tile}
+                size={compact ? "sm" : "md"}
+                onClick={isInteractive ? () => onTileClick?.(tile.id, meld.id) : undefined}
+                showAssigned={tile.isJoker && isValid}
+              />
+              {isNewTile && (
+                <div
+                  className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary rounded-full border border-background"
+                  title="Placed this turn"
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* Info and actions row */}

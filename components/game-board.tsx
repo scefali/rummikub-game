@@ -185,6 +185,8 @@ export function GameBoard({
         .filter((m) => m.tiles.length > 0)
 
       onPlayTiles(updatedMelds, myHand, [...workingArea, tile])
+
+      setSelectedWorkingTiles((prev) => new Set([...prev, tileId]))
     },
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
@@ -198,6 +200,8 @@ export function GameBoard({
 
       const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
       onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
+
+      setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
     },
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
@@ -250,6 +254,20 @@ export function GameBoard({
     workingArea.length > 0 ||
     myHand.length !== gameState.turnStartHand.length ||
     !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
+
+  const turnStartTileIds = new Set<string>()
+  gameState.turnStartMelds.forEach((meld) => {
+    meld.tiles.forEach((tile) => turnStartTileIds.add(tile.id))
+  })
+
+  const newTileIds = new Set<string>()
+  gameState.melds.forEach((meld) => {
+    meld.tiles.forEach((tile) => {
+      if (!turnStartTileIds.has(tile.id)) {
+        newTileIds.add(tile.id)
+      }
+    })
+  })
 
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
@@ -352,6 +370,7 @@ export function GameBoard({
                 onTileClick={isMyTurn && canUseTableTiles ? takeTileFromMeld : undefined}
                 onAddTile={isMyTurn ? addToMeld : undefined}
                 onDeleteMeld={isMyTurn && canUseTableTiles ? breakMeld : undefined}
+                newTileIds={newTileIds}
               />
             ))}
 

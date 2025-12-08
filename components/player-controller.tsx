@@ -252,6 +252,20 @@ export function PlayerController({
     myHand.length !== gameState.turnStartHand.length ||
     !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
 
+  const turnStartTileIds = new Set<string>()
+  gameState.turnStartMelds.forEach((meld) => {
+    meld.tiles.forEach((tile) => turnStartTileIds.add(tile.id))
+  })
+
+  const newTileIds = new Set<string>()
+  gameState.melds.forEach((meld) => {
+    meld.tiles.forEach((tile) => {
+      if (!turnStartTileIds.has(tile.id)) {
+        newTileIds.add(tile.id)
+      }
+    })
+  })
+
   return (
     <div className={cn("h-dvh flex flex-col overflow-hidden", currentStyle.background)}>
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
@@ -378,6 +392,7 @@ export function PlayerController({
                   onAddTile={isMyTurn ? addToMeld : undefined}
                   onDeleteMeld={isMyTurn && canUseTableTiles ? breakMeld : undefined}
                   compact
+                  newTileIds={newTileIds}
                 />
               ))}
             </div>

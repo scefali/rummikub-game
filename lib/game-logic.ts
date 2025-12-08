@@ -64,7 +64,14 @@ export function shuffle<T>(array: T[]): T[] {
 
 // Initialize a new game
 export function initializeGame(
-  playerIds: { id: string; name: string; isHost: boolean; playerCode?: string; email?: string }[],
+  playerIds: {
+    id: string
+    name: string
+    isHost: boolean
+    playerCode?: string
+    email?: string
+    hasInitialMeld?: boolean
+  }[],
   rules?: GameRules,
 ): GameState {
   // Determine rules based on player count if not provided
