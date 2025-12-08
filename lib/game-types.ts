@@ -43,6 +43,7 @@ export interface GameState {
   turnStartMelds: Meld[] // Snapshot at turn start for validation
   turnStartHand: Tile[] // Snapshot of hand at turn start
   workingArea: Tile[] // Tiles taken from board being rearranged
+  rules?: GameRules // Add rules to game state (set when game starts)
 }
 
 // Room state
@@ -74,7 +75,33 @@ export interface WebSocketMessage {
 }
 
 // Game constants
-export const INITIAL_HAND_SIZE = 14
-export const MIN_INITIAL_MELD_POINTS = 30
+export const STANDARD_HAND_SIZE = 14
+export const STANDARD_MELD_POINTS = 30
+export const LARGE_GAME_HAND_SIZE = 12
+export const LARGE_GAME_MELD_POINTS = 25
 export const MIN_PLAYERS = 2
-export const MAX_PLAYERS = 4
+export const MAX_PLAYERS = 6 // Increase max players from 4 to 6
+export const LARGE_GAME_THRESHOLD = 5 // 5+ players triggers large game rules
+
+export function getRulesForPlayerCount(playerCount: number): GameRules {
+  if (playerCount >= LARGE_GAME_THRESHOLD) {
+    return {
+      mode: "large",
+      startingHandSize: LARGE_GAME_HAND_SIZE,
+      initialMeldThreshold: LARGE_GAME_MELD_POINTS,
+    }
+  }
+  return {
+    mode: "standard",
+    startingHandSize: STANDARD_HAND_SIZE,
+    initialMeldThreshold: STANDARD_MELD_POINTS,
+  }
+}
+
+export type RulesMode = "standard" | "large"
+
+export interface GameRules {
+  mode: RulesMode
+  startingHandSize: number
+  initialMeldThreshold: number
+}

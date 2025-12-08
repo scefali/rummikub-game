@@ -1,6 +1,6 @@
 import { Redis } from "@upstash/redis"
 import type { Room, GameState, Player, Meld, Tile } from "./game-types"
-import { MAX_PLAYERS, MIN_PLAYERS } from "./game-types"
+import { MAX_PLAYERS, MIN_PLAYERS, getRulesForPlayerCount } from "./game-types"
 import {
   generateRoomCode,
   generateId,
@@ -78,6 +78,7 @@ export async function createRoom(
       turnStartMelds: [],
       turnStartHand: [],
       workingArea: [],
+      rules: getRulesForPlayerCount(1), // Initialize rules for 1 player
     },
     createdAt: Date.now(),
   }
@@ -190,7 +191,8 @@ export async function startGame(
     email: p.email,
   }))
 
-  room.gameState = initializeGame(playerData)
+  const rules = getRulesForPlayerCount(playerData.length)
+  room.gameState = initializeGame(playerData, rules)
 
   const currentPlayer = room.gameState.players[0]
   room.gameState.turnStartHand = [...currentPlayer.hand]
@@ -308,6 +310,7 @@ export async function handleEndTurn(
     room.gameState.turnStartHand,
     room.gameState.turnStartMelds,
     room.gameState.workingArea,
+    room.gameState.rules,
   )
 
   if (!validation.valid) {
@@ -412,4 +415,23 @@ export async function leaveRoom(roomCode: string, playerId: string): Promise<voi
   } else {
     await setRoom(room)
   }
+}
+
+export async function getPlayerByCode(
+  roomCode: string,
+  playerCode: string,
+): Promise<{ success: boolean; playerName?: string; error?: string }> {
+  const code = roomCode.toUpperCase()
+  const room = await getRoom(code)
+
+  if (!room) {
+    return { success: false, error: "Room not found" }
+  }
+
+  const player = room.gameState.players.find((p) => p.playerCode === playerCode.toUpperCase())
+  if (!player) {
+    return { success: false, error: "Invalid player code" }
+  }
+
+  return { success: true, playerName: player.name }
 }

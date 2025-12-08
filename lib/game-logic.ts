@@ -1,5 +1,5 @@
-import type { Tile, TileColor, Meld, GameState, Player } from "./game-types"
-import { INITIAL_HAND_SIZE } from "./game-types"
+import type { Tile, TileColor, Meld, GameState, Player, GameRules } from "./game-types"
+import { getRulesForPlayerCount, STANDARD_MELD_POINTS } from "./game-types"
 
 // Generate a unique ID
 export function generateId(): string {
@@ -65,12 +65,16 @@ export function shuffle<T>(array: T[]): T[] {
 // Initialize a new game
 export function initializeGame(
   playerIds: { id: string; name: string; isHost: boolean; playerCode?: string; email?: string }[],
+  rules?: GameRules,
 ): GameState {
+  // Determine rules based on player count if not provided
+  const gameRules = rules || getRulesForPlayerCount(playerIds.length)
+
   const tiles = shuffle(createTileSet())
   const players: Player[] = []
 
   for (const { id, name, isHost, playerCode, email } of playerIds) {
-    const hand = tiles.splice(0, INITIAL_HAND_SIZE)
+    const hand = tiles.splice(0, gameRules.startingHandSize)
     players.push({
       id,
       name,
@@ -93,6 +97,7 @@ export function initializeGame(
     turnStartMelds: [],
     turnStartHand: [],
     workingArea: [],
+    rules: gameRules,
   }
 }
 
@@ -305,6 +310,7 @@ export function canEndTurn(
   turnStartHand: Tile[],
   turnStartMelds: Meld[],
   workingArea: Tile[] = [],
+  rules?: GameRules,
 ): { valid: boolean; reason?: string } {
   // Working area must be empty - all tiles must be placed in melds
   if (workingArea.length > 0) {
@@ -328,6 +334,8 @@ export function canEndTurn(
 
   // Check initial meld requirement
   if (!player.hasInitialMeld) {
+    const threshold = rules?.initialMeldThreshold ?? STANDARD_MELD_POINTS
+
     // Calculate points from new melds only
     const newTileIds = new Set(turnStartHand.filter((t) => !player.hand.some((h) => h.id === t.id)).map((t) => t.id))
 
@@ -340,10 +348,10 @@ export function canEndTurn(
       }
     }
 
-    if (newMeldPoints < 30) {
+    if (newMeldPoints < threshold) {
       return {
         valid: false,
-        reason: `Initial meld must be at least 30 points (you have ${newMeldPoints})`,
+        reason: `Initial meld must be at least ${threshold} points (you have ${newMeldPoints})`,
       }
     }
   }

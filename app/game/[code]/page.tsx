@@ -1,6 +1,7 @@
-import { getPlayerCookie, setPlayerCookie } from "@/lib/cookies"
+import { getPlayerCookie } from "@/lib/cookies"
 import { redirect } from "next/navigation"
 import { GameClient } from "./game-client"
+import { GamePageClient } from "./game-page-client"
 import * as gameStore from "@/lib/game-store"
 
 interface GamePageProps {
@@ -16,21 +17,27 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
   // Read player cookie on server
   const playerCookie = await getPlayerCookie()
 
-  if (playerCode && (!playerCookie || playerCookie.roomCode !== roomCode)) {
-    console.log("[v0] Attempting login with player code:", playerCode, "for room:", roomCode)
-    const loginResult = await gameStore.loginWithCode(roomCode, playerCode)
-    console.log("[v0] Login result:", loginResult)
+  if (playerCookie && playerCookie.roomCode === roomCode) {
+    return <GameClient roomCode={roomCode} playerId={playerCookie.odId} playerName={playerCookie.name} />
+  }
 
-    if (loginResult.success && loginResult.playerId && loginResult.playerName) {
-      await setPlayerCookie(loginResult.playerId, loginResult.playerName, roomCode)
-      return <GameClient roomCode={roomCode} playerId={loginResult.playerId} playerName={loginResult.playerName} />
+  if (playerCode) {
+    const playerInfo = await gameStore.getPlayerByCode(roomCode, playerCode)
+
+    if (playerInfo.success && playerInfo.playerName) {
+      // Pass pending login info to client for confirmation
+      return (
+        <GamePageClient
+          roomCode={roomCode}
+          pendingLogin={{
+            playerCode,
+            playerName: playerInfo.playerName,
+          }}
+        />
+      )
     }
   }
 
-  // If no cookie or different room, redirect to home with join param
-  if (!playerCookie || playerCookie.roomCode !== roomCode) {
-    redirect(`/?join=${roomCode}`)
-  }
-
-  return <GameClient roomCode={roomCode} playerId={playerCookie.odId} playerName={playerCookie.name} />
+  // No cookie and no valid player code, redirect to home with join param
+  redirect(`/?join=${roomCode}`)
 }

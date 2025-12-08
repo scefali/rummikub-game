@@ -20,6 +20,7 @@ import {
   LogOut,
 } from "lucide-react"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
+import { STANDARD_MELD_POINTS } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
@@ -252,6 +253,8 @@ export function PlayerController({
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
 
+  const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? STANDARD_MELD_POINTS
+
   return (
     <div className="h-dvh flex flex-col bg-background overflow-hidden">
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
@@ -464,7 +467,7 @@ export function PlayerController({
               {!myPlayer?.hasInitialMeld && (
                 <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
                   <p className="text-xs text-foreground">
-                    First move: melds totaling <strong>30+ pts</strong> from your hand only
+                    First move: melds totaling <strong>{initialMeldThreshold}+ pts</strong> from your hand only
                     {totalNewPoints > 0 && (
                       <span className="ml-2 text-primary font-semibold">({totalNewPoints} pts)</span>
                     )}

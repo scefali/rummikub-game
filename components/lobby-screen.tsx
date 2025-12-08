@@ -3,10 +3,10 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Share2, Crown, Users, Loader2, Check } from "lucide-react"
+import { Share2, Crown, Users, Loader2, Check, Info } from "lucide-react"
 import { useState } from "react"
 import type { GameState } from "@/lib/game-types"
-import { MIN_PLAYERS, MAX_PLAYERS } from "@/lib/game-types"
+import { MIN_PLAYERS, MAX_PLAYERS, LARGE_GAME_THRESHOLD, getRulesForPlayerCount } from "@/lib/game-types"
 import { PlayerCodeDisplay } from "@/components/player-code-display"
 
 interface LobbyScreenProps {
@@ -24,6 +24,9 @@ export function LobbyScreen({ roomCode, playerId, gameState, onStartGame, onLeav
   const isHost = currentPlayer?.isHost ?? false
   const myPlayerCode = currentPlayer?.playerCode
   const canStart = gameState.players.length >= MIN_PLAYERS
+
+  const currentRules = getRulesForPlayerCount(gameState.players.length)
+  const isLargeGame = currentRules.mode === "large"
 
   const shareGameLink = async () => {
     const gameUrl = `${window.location.origin}/game/${roomCode}`
@@ -91,6 +94,46 @@ export function LobbyScreen({ roomCode, playerId, gameState, onStartGame, onLeav
               <PlayerCodeDisplay playerCode={myPlayerCode} />
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card
+        className={`w-full max-w-md mb-6 ${isLargeGame ? "bg-amber-500/10 border-amber-500/30" : "bg-card/80 border-border/50"}`}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Info className={`w-5 h-5 ${isLargeGame ? "text-amber-500" : "text-muted-foreground"}`} />
+            <CardTitle className={`text-lg ${isLargeGame ? "text-amber-500" : "text-foreground"}`}>
+              {isLargeGame ? "Large Game Rules" : "Standard Rules"}
+            </CardTitle>
+            {isLargeGame && <Badge className="bg-amber-500 text-amber-950">5-6 Players</Badge>}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 text-sm">
+            <p className={isLargeGame ? "text-amber-200/80" : "text-muted-foreground"}>
+              {isLargeGame ? (
+                <>
+                  <strong>{gameState.players.length} players detected.</strong> Each player starts with{" "}
+                  <strong>{currentRules.startingHandSize} tiles</strong>, and your first meld only needs{" "}
+                  <strong>{currentRules.initialMeldThreshold} points</strong> instead of 30.
+                </>
+              ) : (
+                <>
+                  {gameState.players.length}-
+                  {Math.min(gameState.players.length + (MAX_PLAYERS - gameState.players.length), 4)} players. Each
+                  player starts with <strong>{currentRules.startingHandSize} tiles</strong>. First meld must total at
+                  least <strong>{currentRules.initialMeldThreshold} points</strong>.
+                </>
+              )}
+            </p>
+            {!isLargeGame && gameState.players.length < LARGE_GAME_THRESHOLD && (
+              <p className="text-xs text-muted-foreground/70">
+                Add {LARGE_GAME_THRESHOLD - gameState.players.length} more player(s) for Large Game Rules (12 tiles, 25
+                pts).
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
