@@ -4,7 +4,19 @@ import { useState, useCallback, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, LogOut } from "lucide-react"
+import {
+  Layers,
+  Users,
+  ArrowRight,
+  AlertCircle,
+  Plus,
+  X,
+  Wrench,
+  ArrowLeft,
+  RotateCcw,
+  LogOut,
+  Settings,
+} from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
@@ -12,6 +24,7 @@ import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { RoomStyleSelector } from "@/components/room-style-selector"
+import { SettingsModal } from "@/components/settings-modal"
 import { generateId, isValidMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -48,6 +61,7 @@ export function GameBoard({
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -232,10 +246,16 @@ export function GameBoard({
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
 
+  const hasChangesToReset =
+    workingArea.length > 0 ||
+    myHand.length !== gameState.turnStartHand.length ||
+    !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
+
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
+      <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
 
       <header className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-4">
@@ -258,6 +278,14 @@ export function GameBoard({
             <Users className="w-4 h-4" />
             <span className="text-sm">{gameState.players.length} players</span>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSettingsModal(true)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Settings className="w-5 h-5" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -450,15 +478,17 @@ export function GameBoard({
               )}
               {isMyTurn && totalSelected === 0 && (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleResetTurn}
-                    className="gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reset
-                  </Button>
+                  {hasChangesToReset && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResetTurn}
+                      className="gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reset
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

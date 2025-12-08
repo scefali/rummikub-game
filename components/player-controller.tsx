@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   LogOut,
+  Settings,
 } from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { STANDARD_MELD_POINTS, ROOM_STYLES } from "@/lib/game-types"
@@ -26,6 +27,7 @@ import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { PlayerCodeDisplay } from "@/components/player-code-display"
+import { SettingsModal } from "@/components/settings-modal"
 import { generateId, isValidMeld, calculateProcessedMeldPoints, processMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -60,6 +62,7 @@ export function PlayerController({
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
   const [handExpanded, setHandExpanded] = useState(true)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -244,10 +247,16 @@ export function PlayerController({
 
   const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? STANDARD_MELD_POINTS
 
+  const hasChangesToReset =
+    workingArea.length > 0 ||
+    myHand.length !== gameState.turnStartHand.length ||
+    !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
+
   return (
     <div className={cn("h-dvh flex flex-col overflow-hidden", currentStyle.background)}>
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
+      <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
 
       <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-2">
@@ -258,6 +267,9 @@ export function PlayerController({
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           {myPlayerCode && <PlayerCodeDisplay playerCode={myPlayerCode} />}
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowSettingsModal(true)}>
+            <Settings className="w-4 h-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -486,17 +498,19 @@ export function PlayerController({
 
       {isMyTurn && (
         <div className="flex-shrink-0 p-3 border-t border-border/50 bg-card/80 backdrop-blur-sm safe-area-pb">
-          <div className="flex justify-center gap-4 mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={handleResetTurn}
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reset Move
-            </Button>
-          </div>
+          {hasChangesToReset && (
+            <div className="flex justify-center gap-4 mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={handleResetTurn}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset Move
+              </Button>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button
               variant="outline"

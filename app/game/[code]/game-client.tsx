@@ -9,6 +9,7 @@ import { GameEndScreen } from "@/components/game-end-screen"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { clearPlayerCookie } from "@/lib/cookies"
 import { showTurnNotification } from "@/lib/notifications"
+import { playTurnSound } from "@/lib/settings"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { Loader2 } from "lucide-react"
 
@@ -72,6 +73,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         if (isMyTurn && lastNotifiedTurnRef.current !== currentPlayerIndex) {
           lastNotifiedTurnRef.current = currentPlayerIndex
           showTurnNotification(playerName, roomCode)
+          playTurnSound()
         }
       }
 
