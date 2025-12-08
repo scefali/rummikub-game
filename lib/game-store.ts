@@ -1,5 +1,5 @@
 import { Redis } from "@upstash/redis"
-import type { Room, GameState, Player, Meld, Tile } from "./game-types"
+import type { Room, GameState, Player, Meld, Tile, RoomStyleId } from "./game-types"
 import { MAX_PLAYERS, MIN_PLAYERS, getRulesForPlayerCount } from "./game-types"
 import {
   generateRoomCode,
@@ -50,7 +50,7 @@ async function setRoom(room: Room): Promise<void> {
 export async function createRoom(
   playerName: string,
   playerEmail?: string,
-): Promise<{ roomCode: string; playerId: string; playerCode: string; gameState: GameState }> {
+): Promise<{ roomCode: string; playerId: string; playerCode: string; gameState: GameState; roomStyleId: RoomStyleId }> {
   const roomCode = generateRoomCode()
   const playerId = generateId()
   const playerCode = generatePlayerCode()
@@ -78,21 +78,29 @@ export async function createRoom(
       turnStartMelds: [],
       turnStartHand: [],
       workingArea: [],
-      rules: getRulesForPlayerCount(1), // Initialize rules for 1 player
+      rules: getRulesForPlayerCount(1),
     },
     createdAt: Date.now(),
+    roomStyleId: "classic",
   }
 
   await setRoom(room)
 
-  return { roomCode, playerId, playerCode, gameState: room.gameState }
+  return { roomCode, playerId, playerCode, gameState: room.gameState, roomStyleId: room.roomStyleId }
 }
 
 export async function joinRoom(
   roomCode: string,
   playerName: string,
   playerEmail?: string,
-): Promise<{ success: boolean; playerId?: string; playerCode?: string; gameState?: GameState; error?: string }> {
+): Promise<{
+  success: boolean
+  playerId?: string
+  playerCode?: string
+  gameState?: GameState
+  roomStyleId?: RoomStyleId
+  error?: string
+}> {
   const code = roomCode.toUpperCase()
   const room = await getRoom(code)
 
@@ -125,7 +133,7 @@ export async function joinRoom(
   room.gameState.players.push(player)
   await setRoom(room)
 
-  return { success: true, playerId, playerCode, gameState: room.gameState }
+  return { success: true, playerId, playerCode, gameState: room.gameState, roomStyleId: room.roomStyleId }
 }
 
 export async function loginWithCode(
@@ -151,19 +159,24 @@ export async function loginWithCode(
   return { success: true, playerId: player.id, playerName: player.name }
 }
 
-export async function getGameState(roomCode: string, playerId: string): Promise<GameState | null> {
+export async function getGameState(
+  roomCode: string,
+  playerId: string,
+): Promise<{ gameState: GameState; roomStyleId: RoomStyleId } | null> {
   const room = await getRoom(roomCode)
   if (!room) return null
 
-  // Return game state with only the requesting player's hand visible
   return {
-    ...room.gameState,
-    players: room.gameState.players.map((p) => ({
-      ...p,
-      hand: p.id === playerId ? p.hand : [],
-      handCount: p.hand.length,
-      playerCode: p.id === playerId ? p.playerCode : undefined,
-    })) as Player[],
+    gameState: {
+      ...room.gameState,
+      players: room.gameState.players.map((p) => ({
+        ...p,
+        hand: p.id === playerId ? p.hand : [],
+        handCount: p.hand.length,
+        playerCode: p.id === playerId ? p.playerCode : undefined,
+      })) as Player[],
+    },
+    roomStyleId: room.roomStyleId || "classic",
   }
 }
 
@@ -434,4 +447,23 @@ export async function getPlayerByCode(
   }
 
   return { success: true, playerName: player.name }
+}
+
+export async function changeRoomStyle(
+  roomCode: string,
+  playerId: string,
+  styleId: RoomStyleId,
+): Promise<{ success: boolean; error?: string }> {
+  const room = await getRoom(roomCode)
+  if (!room) return { success: false, error: "Room not found" }
+
+  const player = room.gameState.players.find((p) => p.id === playerId)
+  if (!player?.isHost) {
+    return { success: false, error: "Only the host can change the room style" }
+  }
+
+  room.roomStyleId = styleId
+  await setRoom(room)
+
+  return { success: true }
 }

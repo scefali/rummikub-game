@@ -9,7 +9,7 @@ import { GameEndScreen } from "@/components/game-end-screen"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { clearPlayerCookie } from "@/lib/cookies"
 import { showTurnNotification } from "@/lib/notifications"
-import type { GameState, Meld, Tile } from "@/lib/game-types"
+import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { Loader2 } from "lucide-react"
 
 interface GameClientProps {
@@ -23,6 +23,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
   const isMobile = useIsMobile()
 
   const [gameState, setGameState] = useState<GameState | null>(null)
+  const [roomStyleId, setRoomStyleId] = useState<RoomStyleId>("classic")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -58,6 +59,10 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       })
       const newGameState = data.gameState as GameState
 
+      if (data.roomStyleId) {
+        setRoomStyleId(data.roomStyleId)
+      }
+
       if (newGameState.phase === "playing") {
         const currentPlayerIndex = newGameState.currentPlayerIndex
         const currentPlayer = newGameState.players[currentPlayerIndex]
@@ -78,7 +83,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     } catch (err) {
       // If room not found, clear cookie and redirect
       if (err instanceof Error && err.message.includes("not found")) {
-        await clearPlayerCookie()
+        await clearPlayerCookie(roomCode)
         router.push("/")
       }
     } finally {
@@ -172,6 +177,18 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     }
   }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
+  const changeRoomStyle = useCallback(
+    async (styleId: RoomStyleId) => {
+      try {
+        await apiCall({ action: "change_room_style", roomCode, playerId, styleId })
+        setRoomStyleId(styleId)
+      } catch (err) {
+        setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to change room style")
+      }
+    },
+    [roomCode, playerId, apiCall, setErrorWithTimestamp],
+  )
+
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -184,7 +201,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       // Ignore
     }
 
-    await clearPlayerCookie()
+    await clearPlayerCookie(roomCode)
     router.push("/")
   }, [roomCode, playerId, apiCall, router])
 
@@ -209,8 +226,11 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         roomCode={roomCode}
         playerId={playerId}
         gameState={gameState}
+        roomStyleId={roomStyleId}
+        isHost={isHost}
         onStartGame={startGame}
         onLeave={disconnect}
+        onChangeRoomStyle={changeRoomStyle}
       />
     )
   }
@@ -221,6 +241,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       <GameEndScreen
         gameState={gameState}
         playerId={playerId}
+        roomStyleId={roomStyleId}
         onPlayAgain={() => {
           disconnect()
         }}
@@ -235,6 +256,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         gameState={gameState}
         playerId={playerId}
         roomCode={roomCode}
+        roomStyleId={roomStyleId}
         onPlayTiles={playTiles}
         onDrawTile={drawTile}
         onEndTurn={endTurn}
@@ -250,11 +272,14 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       gameState={gameState}
       playerId={playerId}
       roomCode={roomCode}
+      roomStyleId={roomStyleId}
+      isHost={isHost}
       onPlayTiles={playTiles}
       onDrawTile={drawTile}
       onEndTurn={endTurn}
       onResetTurn={resetTurn}
       onEndGame={endGame}
+      onChangeRoomStyle={changeRoomStyle}
       error={error}
     />
   )

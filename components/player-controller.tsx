@@ -19,8 +19,8 @@ import {
   ChevronUp,
   LogOut,
 } from "lucide-react"
-import type { GameState, Meld, Tile } from "@/lib/game-types"
-import { STANDARD_MELD_POINTS } from "@/lib/game-types"
+import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
+import { STANDARD_MELD_POINTS, ROOM_STYLES } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
@@ -33,6 +33,7 @@ interface PlayerControllerProps {
   gameState: GameState
   playerId: string
   roomCode: string
+  roomStyleId: RoomStyleId
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
@@ -45,6 +46,7 @@ export function PlayerController({
   gameState,
   playerId,
   roomCode,
+  roomStyleId,
   onPlayTiles,
   onDrawTile,
   onEndTurn,
@@ -66,6 +68,8 @@ export function PlayerController({
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
   const myPlayerCode = myPlayer?.playerCode
+
+  const currentStyle = ROOM_STYLES[roomStyleId]
 
   const sortedHand = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
@@ -174,21 +178,6 @@ export function PlayerController({
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
 
-  const returnToHand = useCallback(
-    (tileId: string) => {
-      const tile = workingArea.find((t) => t.id === tileId)
-      if (!tile) return
-
-      const wasFromHand = gameState.turnStartHand.some((t) => t.id === tileId)
-
-      if (wasFromHand) {
-        const remainingWorking = workingArea.filter((t) => t.id !== tileId)
-        onPlayTiles(gameState.melds, [...myHand, tile], remainingWorking)
-      }
-    },
-    [workingArea, gameState.turnStartHand, gameState.melds, myHand, onPlayTiles],
-  )
-
   const returnSelectedToHand = useCallback(() => {
     const tilesToReturn: Tile[] = []
     const tilesToKeep: Tile[] = []
@@ -256,11 +245,11 @@ export function PlayerController({
   const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? STANDARD_MELD_POINTS
 
   return (
-    <div className="h-dvh flex flex-col bg-background overflow-hidden">
+    <div className={cn("h-dvh flex flex-col overflow-hidden", currentStyle.background)}>
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
 
-      <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50">
+      <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold text-foreground">Rummikub</h1>
           <Badge variant="secondary" className="font-mono text-xs">
@@ -321,7 +310,7 @@ export function PlayerController({
       )}
 
       {showPlayers && (
-        <div className="flex-shrink-0 p-3 bg-card/50 border-b border-border/50 max-h-40 overflow-auto">
+        <div className="flex-shrink-0 p-3 bg-card/50 backdrop-blur-sm border-b border-border/50 max-h-40 overflow-auto">
           <div className="flex flex-wrap gap-2">
             {gameState.players.map((player, index) => (
               <div
@@ -425,7 +414,7 @@ export function PlayerController({
           )}
         </div>
 
-        <div className="flex-shrink-0 bg-card/50 p-3 border-t border-border/30">
+        <div className="flex-shrink-0 bg-card/50 backdrop-blur-sm p-3 border-t border-border/30">
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={() => setHandExpanded(!handExpanded)}
@@ -496,7 +485,7 @@ export function PlayerController({
       </div>
 
       {isMyTurn && (
-        <div className="flex-shrink-0 p-3 border-t border-border/50 bg-card/80 safe-area-pb">
+        <div className="flex-shrink-0 p-3 border-t border-border/50 bg-card/80 backdrop-blur-sm safe-area-pb">
           <div className="flex justify-center gap-4 mb-2">
             <Button
               variant="ghost"

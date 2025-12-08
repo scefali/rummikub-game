@@ -5,11 +5,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Layers, Users, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, LogOut } from "lucide-react"
-import type { GameState, Meld, Tile } from "@/lib/game-types"
+import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
+import { ROOM_STYLES } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
+import { RoomStyleSelector } from "@/components/room-style-selector"
 import { generateId, isValidMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -17,11 +19,14 @@ interface GameBoardProps {
   gameState: GameState
   playerId: string
   roomCode: string
+  roomStyleId: RoomStyleId
+  isHost: boolean
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
   onEndGame: () => void
+  onChangeRoomStyle: (styleId: RoomStyleId) => void
   error?: string | null
 }
 
@@ -29,11 +34,14 @@ export function GameBoard({
   gameState,
   playerId,
   roomCode,
+  roomStyleId,
+  isHost,
   onPlayTiles,
   onDrawTile,
   onEndTurn,
   onResetTurn,
   onEndGame,
+  onChangeRoomStyle,
   error,
 }: GameBoardProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -48,6 +56,8 @@ export function GameBoard({
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
   const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
+
+  const currentStyle = ROOM_STYLES[roomStyleId]
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -223,19 +233,23 @@ export function GameBoard({
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
 
-      <header className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50">
+      <header className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold text-foreground">Rummikub</h1>
           <Badge variant="secondary" className="font-mono">
             {roomCode}
           </Badge>
+          <Badge variant="outline" className={cn("text-xs", currentStyle.accent)}>
+            {currentStyle.name}
+          </Badge>
         </div>
 
         <div className="flex items-center gap-4">
+          {isHost && <RoomStyleSelector currentStyleId={roomStyleId} onStyleChange={onChangeRoomStyle} />}
           <div className="flex items-center gap-2 text-muted-foreground">
             <Layers className="w-4 h-4" />
             <span className="text-sm">{gameState.tilePool.length} tiles left</span>
@@ -327,7 +341,7 @@ export function GameBoard({
           </div>
         </div>
 
-        <div className="w-64 border-l border-border/50 bg-card/30 p-4">
+        <div className="w-64 border-l border-border/50 bg-card/30 backdrop-blur-sm p-4">
           <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wide">Players</h3>
           <div className="space-y-3">
             {gameState.players.map((player, index) => (
@@ -406,7 +420,7 @@ export function GameBoard({
       )}
 
       {myPlayer && (
-        <div className="border-t border-border/50 bg-card/50 p-4">
+        <div className="border-t border-border/50 bg-card/50 backdrop-blur-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Hand</h3>

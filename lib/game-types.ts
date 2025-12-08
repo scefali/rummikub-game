@@ -51,6 +51,7 @@ export interface Room {
   code: string
   gameState: GameState
   createdAt: number
+  roomStyleId: RoomStyleId // Add roomStyleId
 }
 
 // WebSocket message types
@@ -104,4 +105,46 @@ export interface GameRules {
   mode: RulesMode
   startingHandSize: number
   initialMeldThreshold: number
+}
+
+export type RoomStyleId = "classic" | "ocean" | "forest" | "sunset" | "neon"
+
+export interface RoomStyle {
+  id: RoomStyleId
+  name: string
+  background: string
+  accent: string
+}
+
+export const ROOM_STYLES: Record<RoomStyleId, RoomStyle> = {
+  classic: {
+    id: "classic",
+    name: "Classic",
+    background: "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900",
+    accent: "text-emerald-500",
+  },
+  ocean: {
+    id: "ocean",
+    name: "Ocean Waves",
+    background: "bg-gradient-to-br from-blue-950 via-cyan-900 to-blue-950",
+    accent: "text-cyan-400",
+  },
+  forest: {
+    id: "forest",
+    name: "Forest",
+    background: "bg-gradient-to-br from-green-950 via-emerald-900 to-green-950",
+    accent: "text-emerald-400",
+  },
+  sunset: {
+    id: "sunset",
+    name: "Sunset",
+    background: "bg-gradient-to-br from-orange-950 via-rose-900 to-purple-950",
+    accent: "text-orange-400",
+  },
+  neon: {
+    id: "neon",
+    name: "Neon Night",
+    background: "bg-gradient-to-br from-purple-950 via-fuchsia-900 to-violet-950",
+    accent: "text-fuchsia-400",
+  },
 }

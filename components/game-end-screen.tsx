@@ -3,17 +3,22 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Trophy, Medal, RotateCcw } from "lucide-react"
-import type { GameState } from "@/lib/game-types"
+import type { GameState, RoomStyleId } from "@/lib/game-types"
+import { ROOM_STYLES } from "@/lib/game-types"
+import { cn } from "@/lib/utils"
 
 interface GameEndScreenProps {
   gameState: GameState
   playerId: string
+  roomStyleId: RoomStyleId
   onPlayAgain: () => void
 }
 
-export function GameEndScreen({ gameState, playerId, onPlayAgain }: GameEndScreenProps) {
+export function GameEndScreen({ gameState, playerId, roomStyleId, onPlayAgain }: GameEndScreenProps) {
   const winner = gameState.players.find((p) => p.id === gameState.winner)
   const isWinner = gameState.winner === playerId
+
+  const currentStyle = ROOM_STYLES[roomStyleId]
 
   // Calculate remaining points for each player
   const playerScores = gameState.players.map((player) => ({
@@ -25,7 +30,7 @@ export function GameEndScreen({ gameState, playerId, onPlayAgain }: GameEndScree
   const sortedPlayers = [...playerScores].sort((a, b) => a.remainingPoints - b.remainingPoints)
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-background to-secondary/20">
+    <div className={cn("min-h-screen flex flex-col items-center justify-center p-4", currentStyle.background)}>
       {/* Winner Announcement */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/20 mb-4">

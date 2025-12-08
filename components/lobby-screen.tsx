@@ -5,28 +5,45 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Share2, Crown, Users, Loader2, Check, Info } from "lucide-react"
 import { useState } from "react"
-import type { GameState } from "@/lib/game-types"
-import { MIN_PLAYERS, MAX_PLAYERS, LARGE_GAME_THRESHOLD, getRulesForPlayerCount } from "@/lib/game-types"
+import type { GameState, RoomStyleId } from "@/lib/game-types"
+import { MIN_PLAYERS, MAX_PLAYERS, LARGE_GAME_THRESHOLD, getRulesForPlayerCount, ROOM_STYLES } from "@/lib/game-types"
 import { PlayerCodeDisplay } from "@/components/player-code-display"
+import { RoomStyleSelector } from "@/components/room-style-selector"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
 
 interface LobbyScreenProps {
   roomCode: string
   playerId: string
   gameState: GameState
+  roomStyleId: RoomStyleId
+  isHost: boolean
   onStartGame: () => void
   onLeave: () => void
+  onChangeRoomStyle: (styleId: RoomStyleId) => void
 }
 
-export function LobbyScreen({ roomCode, playerId, gameState, onStartGame, onLeave }: LobbyScreenProps) {
+export function LobbyScreen({
+  roomCode,
+  playerId,
+  gameState,
+  roomStyleId,
+  isHost,
+  onStartGame,
+  onLeave,
+  onChangeRoomStyle,
+}: LobbyScreenProps) {
   const [linkCopied, setLinkCopied] = useState(false)
+  const isMobile = useIsMobile()
 
   const currentPlayer = gameState.players.find((p) => p.id === playerId)
-  const isHost = currentPlayer?.isHost ?? false
   const myPlayerCode = currentPlayer?.playerCode
   const canStart = gameState.players.length >= MIN_PLAYERS
 
   const currentRules = getRulesForPlayerCount(gameState.players.length)
   const isLargeGame = currentRules.mode === "large"
+
+  const currentStyle = ROOM_STYLES[roomStyleId]
 
   const shareGameLink = async () => {
     const gameUrl = `${window.location.origin}/game/${roomCode}`
@@ -63,16 +80,29 @@ export function LobbyScreen({ roomCode, playerId, gameState, onStartGame, onLeav
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-background to-secondary/20">
+    <div className={cn("min-h-screen flex flex-col items-center justify-center p-4", currentStyle.background)}>
       {/* Room Code Display */}
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm border-border/50 mb-6">
         <CardHeader className="text-center pb-2">
-          <CardTitle className="text-lg text-muted-foreground">Room Code</CardTitle>
+          <div className="flex items-center justify-center gap-2">
+            <CardTitle className="text-lg text-muted-foreground">Room Code</CardTitle>
+            <Badge variant="outline" className={cn("text-xs", currentStyle.accent)}>
+              {currentStyle.name}
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent className="text-center">
           <div className="flex items-center justify-center mb-4">
             <span className="text-5xl font-mono font-bold tracking-[0.3em] text-primary">{roomCode}</span>
           </div>
+
+          {/* Room Style Selector - only for host on desktop */}
+          {isHost && !isMobile && (
+            <div className="mb-4">
+              <RoomStyleSelector currentStyleId={roomStyleId} onStyleChange={onChangeRoomStyle} />
+            </div>
+          )}
+
           {/* Share Game Link Button - now primary and more prominent */}
           <Button onClick={shareGameLink} className="gap-2 w-full mb-4">
             {linkCopied ? (
