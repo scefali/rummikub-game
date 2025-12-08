@@ -36,11 +36,13 @@ interface PlayerControllerProps {
   playerId: string
   roomCode: string
   roomStyleId: RoomStyleId
+  isHost: boolean
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
   onEndGame: () => void
+  onChangeRoomStyle: (styleId: RoomStyleId) => void
   error?: string | null
 }
 
@@ -49,11 +51,13 @@ export function PlayerController({
   playerId,
   roomCode,
   roomStyleId,
+  isHost,
   onPlayTiles,
   onDrawTile,
   onEndTurn,
   onResetTurn,
   onEndGame,
+  onChangeRoomStyle,
   error,
 }: PlayerControllerProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -252,15 +256,12 @@ export function PlayerController({
     myHand.length !== gameState.turnStartHand.length ||
     !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
 
-  const turnStartTileIds = new Set<string>()
-  gameState.turnStartMelds.forEach((meld) => {
-    meld.tiles.forEach((tile) => turnStartTileIds.add(tile.id))
-  })
+  const lastSeenTileIds = new Set(myPlayer?.lastSeenMeldTileIds || [])
 
   const newTileIds = new Set<string>()
   gameState.melds.forEach((meld) => {
     meld.tiles.forEach((tile) => {
-      if (!turnStartTileIds.has(tile.id)) {
+      if (!lastSeenTileIds.has(tile.id)) {
         newTileIds.add(tile.id)
       }
     })
@@ -270,7 +271,13 @@ export function PlayerController({
     <div className={cn("h-dvh flex flex-col overflow-hidden", currentStyle.background)}>
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
-      <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        roomStyleId={roomStyleId}
+        onStyleChange={onChangeRoomStyle}
+        isHost={isHost}
+      />
 
       <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-2">

@@ -23,7 +23,6 @@ import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
-import { RoomStyleSelector } from "@/components/room-style-selector"
 import { SettingsModal } from "@/components/settings-modal"
 import { generateId, isValidMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
@@ -255,15 +254,12 @@ export function GameBoard({
     myHand.length !== gameState.turnStartHand.length ||
     !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
 
-  const turnStartTileIds = new Set<string>()
-  gameState.turnStartMelds.forEach((meld) => {
-    meld.tiles.forEach((tile) => turnStartTileIds.add(tile.id))
-  })
+  const lastSeenTileIds = new Set(myPlayer?.lastSeenMeldTileIds || [])
 
   const newTileIds = new Set<string>()
   gameState.melds.forEach((meld) => {
     meld.tiles.forEach((tile) => {
-      if (!turnStartTileIds.has(tile.id)) {
+      if (!lastSeenTileIds.has(tile.id)) {
         newTileIds.add(tile.id)
       }
     })
@@ -273,7 +269,13 @@ export function GameBoard({
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
-      <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        roomStyleId={roomStyleId}
+        onStyleChange={onChangeRoomStyle}
+        isHost={isHost}
+      />
 
       <header className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-4">
@@ -287,7 +289,6 @@ export function GameBoard({
         </div>
 
         <div className="flex items-center gap-4">
-          {isHost && <RoomStyleSelector currentStyleId={roomStyleId} onStyleChange={onChangeRoomStyle} />}
           <div className="flex items-center gap-2 text-muted-foreground">
             <Layers className="w-4 h-4" />
             <span className="text-sm">{gameState.tilePool.length} tiles left</span>

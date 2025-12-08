@@ -178,13 +178,33 @@ function assignJokerValuesInSet(tiles: Tile[]): Tile[] {
   })
 }
 
+export function sortTilesForDisplay(tiles: Tile[]): Tile[] {
+  return [...tiles].sort((a, b) => {
+    // Jokers go to the end if not assigned
+    if (a.isJoker && !a.assignedNumber && b.isJoker && !b.assignedNumber) return 0
+    if (a.isJoker && !a.assignedNumber) return 1
+    if (b.isJoker && !b.assignedNumber) return -1
+
+    // Sort by number first
+    const numA = a.isJoker ? (a.assignedNumber ?? 0) : a.number
+    const numB = b.isJoker ? (b.assignedNumber ?? 0) : b.number
+    if (numA !== numB) return numA - numB
+
+    // Then by color for same numbers
+    const colorOrder: Record<TileColor, number> = { red: 0, blue: 1, yellow: 2, black: 3 }
+    const colorA = a.isJoker ? (a.assignedColor ?? a.color) : a.color
+    const colorB = b.isJoker ? (b.assignedColor ?? b.color) : b.color
+    return colorOrder[colorA] - colorOrder[colorB]
+  })
+}
+
 export function processMeld(meld: Meld): Meld {
   if (isValidRun(meld.tiles)) {
     return { ...meld, tiles: assignJokerValuesInRun(meld.tiles) }
   } else if (isValidSet(meld.tiles)) {
     return { ...meld, tiles: assignJokerValuesInSet(meld.tiles) }
   }
-  return meld
+  return { ...meld, tiles: sortTilesForDisplay(meld.tiles) }
 }
 
 // Check if a meld is a valid set (same number, different colors)

@@ -5,16 +5,21 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
-import { X, Volume2, VolumeX, Bell } from "lucide-react"
+import { X, Volume2, VolumeX, Bell, Check } from "lucide-react"
 import { getSettings, saveSettings, playTestSound, type GameSettings } from "@/lib/settings"
 import { getNotificationPermission, requestNotificationPermission } from "@/lib/notifications"
+import { ROOM_STYLES, type RoomStyleId } from "@/lib/game-types"
+import { cn } from "@/lib/utils"
 
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
+  roomStyleId?: RoomStyleId
+  onStyleChange?: (styleId: RoomStyleId) => void
+  isHost?: boolean
 }
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, roomStyleId, onStyleChange, isHost }: SettingsModalProps) {
   const [settings, setSettings] = useState<GameSettings>(getSettings())
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default")
 
@@ -51,7 +56,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-md p-6 bg-card border-border">
+      <Card className="w-full max-w-md p-6 bg-card border-border max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-foreground">Settings</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -60,8 +65,39 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         <div className="space-y-6">
+          {roomStyleId && onStyleChange && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Room Background</h3>
+
+              <div className="grid grid-cols-1 gap-2">
+                {Object.values(ROOM_STYLES).map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => isHost && onStyleChange(style.id)}
+                    disabled={!isHost}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border transition-all",
+                      style.id === roomStyleId
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50",
+                      !isHost && "opacity-60 cursor-not-allowed",
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-8 h-8 rounded-md", style.background)} />
+                      <span className="font-medium text-foreground">{style.name}</span>
+                    </div>
+                    {style.id === roomStyleId && <Check className="w-5 h-5 text-primary" />}
+                  </button>
+                ))}
+              </div>
+
+              {!isHost && <p className="text-xs text-muted-foreground">Only the host can change the room background</p>}
+            </div>
+          )}
+
           {/* Sound Settings */}
-          <div className="space-y-4">
+          <div className={cn("space-y-4", roomStyleId && "pt-4 border-t border-border")}>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sound</h3>
 
             <div className="flex items-center justify-between">

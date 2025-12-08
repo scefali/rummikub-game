@@ -64,6 +64,7 @@ export async function createRoom(
     isConnected: true,
     email: playerEmail || undefined,
     playerCode,
+    lastSeenMeldTileIds: [], // Initialize lastSeenMeldTileIds as empty for the host
   }
 
   const room: Room = {
@@ -128,6 +129,7 @@ export async function joinRoom(
     isConnected: true,
     email: playerEmail || undefined,
     playerCode,
+    lastSeenMeldTileIds: [], // Initialize lastSeenMeldTileIds as empty for all players
   }
 
   room.gameState.players.push(player)
@@ -203,14 +205,11 @@ export async function startGame(
     playerCode: p.playerCode,
     email: p.email,
     hasInitialMeld: false,
+    lastSeenMeldTileIds: [], // Initialize lastSeenMeldTileIds as empty for all players
   }))
 
   const rules = getRulesForPlayerCount(playerData.length)
   room.gameState = initializeGame(playerData, rules)
-
-  room.gameState.players.forEach((p) => {
-    p.hasInitialMeld = false
-  })
 
   const currentPlayer = room.gameState.players[0]
   room.gameState.turnStartHand = [...currentPlayer.hand]
@@ -277,6 +276,12 @@ export async function handleDrawTile(
     currentPlayer.hand.push(tile)
   }
 
+  const currentMeldTileIds: string[] = []
+  room.gameState.melds.forEach((meld) => {
+    meld.tiles.forEach((t) => currentMeldTileIds.push(t.id))
+  })
+  currentPlayer.lastSeenMeldTileIds = currentMeldTileIds
+
   // Move to next player
   room.gameState.currentPlayerIndex = nextPlayer(room.gameState)
   const nextPlayerObj = room.gameState.players[room.gameState.currentPlayerIndex]
@@ -341,6 +346,12 @@ export async function handleEndTurn(
   if (!currentPlayer.hasInitialMeld) {
     currentPlayer.hasInitialMeld = true
   }
+
+  const currentMeldTileIds: string[] = []
+  room.gameState.melds.forEach((meld) => {
+    meld.tiles.forEach((t) => currentMeldTileIds.push(t.id))
+  })
+  currentPlayer.lastSeenMeldTileIds = currentMeldTileIds
 
   const endCheck = checkGameEnd(room.gameState)
   if (endCheck.ended) {
@@ -415,6 +426,7 @@ export async function endGame(roomCode: string, playerId: string): Promise<{ suc
     ...p,
     hand: [],
     hasInitialMeld: false,
+    lastSeenMeldTileIds: [], // Reset lastSeenMeldTileIds for all players
   }))
 
   await setRoom(room)

@@ -27,6 +27,7 @@ export interface Player {
   isConnected: boolean
   email?: string // Optional email field
   playerCode: string // 6-character code for cross-device login
+  lastSeenMeldTileIds?: string[] // Tile IDs on board when player last ended turn
 }
 
 // Game phases
