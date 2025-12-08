@@ -179,6 +179,8 @@ export function HomeClient({ joinCode }: HomeClientProps) {
                   onChange={(e) => setPlayerName(e.target.value)}
                   maxLength={20}
                   className="bg-input/50"
+                  autoComplete="name"
+                  name="name"
                 />
               </div>
 
@@ -196,6 +198,8 @@ export function HomeClient({ joinCode }: HomeClientProps) {
                   value={playerEmail}
                   onChange={(e) => setPlayerEmail(e.target.value)}
                   className="bg-input/50"
+                  autoComplete="email"
+                  name="email"
                 />
               </div>
 
@@ -224,6 +228,8 @@ export function HomeClient({ joinCode }: HomeClientProps) {
                   onChange={(e) => setPlayerName(e.target.value)}
                   maxLength={20}
                   className="bg-input/50"
+                  autoComplete="name"
+                  name="name"
                 />
               </div>
 
@@ -241,6 +247,8 @@ export function HomeClient({ joinCode }: HomeClientProps) {
                   value={playerEmail}
                   onChange={(e) => setPlayerEmail(e.target.value)}
                   className="bg-input/50"
+                  autoComplete="email"
+                  name="email"
                 />
               </div>
 

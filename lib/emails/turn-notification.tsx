@@ -1,12 +1,18 @@
-import { Body, Button, Container, Head, Heading, Html, Preview, Section, Text } from "@react-email/components"
+import { Body, Button, Container, Head, Heading, Html, Preview, Section, Text, Hr } from "@react-email/components"
+
+interface PlayerStanding {
+  name: string
+  tileCount: number
+}
 
 interface TurnNotificationEmailProps {
   playerName: string
   roomCode: string
   gameUrl: string
+  playerStandings?: PlayerStanding[]
 }
 
-export function TurnNotificationEmail({ playerName, roomCode, gameUrl }: TurnNotificationEmailProps) {
+export function TurnNotificationEmail({ playerName, roomCode, gameUrl, playerStandings }: TurnNotificationEmailProps) {
   return (
     <Html>
       <Head />
@@ -18,6 +24,23 @@ export function TurnNotificationEmail({ playerName, roomCode, gameUrl }: TurnNot
           <Text style={text}>
             Room Code: <strong>{roomCode}</strong>
           </Text>
+
+          {playerStandings && playerStandings.length > 0 && (
+            <>
+              <Hr style={divider} />
+              <Text style={standingsTitle}>Current Standings:</Text>
+              {playerStandings
+                .sort((a, b) => a.tileCount - b.tileCount)
+                .map((player, index) => (
+                  <Text key={index} style={player.name === playerName ? standingRowHighlight : standingRow}>
+                    {player.name}: <strong>{player.tileCount} tiles</strong>
+                    {player.tileCount === 0 && " 🏆"}
+                  </Text>
+                ))}
+              <Hr style={divider} />
+            </>
+          )}
+
           <Section style={buttonContainer}>
             <Button style={button} href={gameUrl}>
               Play Now
@@ -78,4 +101,36 @@ const footer = {
   fontSize: "14px",
   margin: "32px 0 0",
   textAlign: "center" as const,
+}
+
+const divider = {
+  borderColor: "#334155",
+  margin: "24px 0",
+}
+
+const standingsTitle = {
+  color: "#94a3b8",
+  fontSize: "14px",
+  fontWeight: "600",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.05em",
+  margin: "0 0 12px",
+  textAlign: "center" as const,
+}
+
+const standingRow = {
+  color: "#cbd5e1",
+  fontSize: "14px",
+  lineHeight: "20px",
+  margin: "4px 0",
+  textAlign: "center" as const,
+}
+
+const standingRowHighlight = {
+  color: "#2dd4bf",
+  fontSize: "14px",
+  lineHeight: "20px",
+  margin: "4px 0",
+  textAlign: "center" as const,
+  fontWeight: "600",
 }

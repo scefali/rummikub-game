@@ -234,6 +234,7 @@ export async function handleDrawTile(
   drawnTile?: Tile
   error?: string
   nextPlayer?: { name: string; email?: string; playerCode?: string }
+  playerStandings?: { name: string; tileCount: number }[]
 }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -263,6 +264,11 @@ export async function handleDrawTile(
 
   await setRoom(room)
 
+  const playerStandings = room.gameState.players.map((p) => ({
+    name: p.name,
+    tileCount: p.hand.length,
+  }))
+
   return {
     success: true,
     drawnTile: tile || undefined,
@@ -271,6 +277,7 @@ export async function handleDrawTile(
       email: nextPlayerObj.email,
       playerCode: nextPlayerObj.playerCode,
     },
+    playerStandings,
   }
 }
 
@@ -283,6 +290,7 @@ export async function handleEndTurn(
   gameEnded?: boolean
   winner?: string
   nextPlayer?: { name: string; email?: string; playerCode?: string }
+  playerStandings?: { name: string; tileCount: number }[]
 }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -326,6 +334,11 @@ export async function handleEndTurn(
 
   await setRoom(room)
 
+  const playerStandings = room.gameState.players.map((p) => ({
+    name: p.name,
+    tileCount: p.hand.length,
+  }))
+
   return {
     success: true,
     nextPlayer: {
@@ -333,6 +346,7 @@ export async function handleEndTurn(
       email: nextPlayerObj.email,
       playerCode: nextPlayerObj.playerCode,
     },
+    playerStandings,
   }
 }
 

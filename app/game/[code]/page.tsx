@@ -17,15 +17,12 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
   const playerCookie = await getPlayerCookie()
 
   if (playerCode && (!playerCookie || playerCookie.roomCode !== roomCode)) {
+    console.log("[v0] Attempting login with player code:", playerCode, "for room:", roomCode)
     const loginResult = await gameStore.loginWithCode(roomCode, playerCode)
+    console.log("[v0] Login result:", loginResult)
+
     if (loginResult.success && loginResult.playerId && loginResult.playerName) {
-      // Set the cookie for this device
-      await setPlayerCookie({
-        odId: loginResult.playerId,
-        name: loginResult.playerName,
-        roomCode: roomCode,
-      })
-      // Use the logged in player info
+      await setPlayerCookie(loginResult.playerId, loginResult.playerName, roomCode)
       return <GameClient roomCode={roomCode} playerId={loginResult.playerId} playerName={loginResult.playerName} />
     }
   }
