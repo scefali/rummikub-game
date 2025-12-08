@@ -6,9 +6,19 @@ export function generateId(): string {
   return Math.random().toString(36).substring(2, 9)
 }
 
+// Generate 6-character player code for cross-device login
+export function generatePlayerCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Removed confusing characters
+  let code = ""
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return code
+}
+
 // Generate room code (4-6 uppercase letters)
 export function generateRoomCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ" // Removed confusing letters
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ" // Removed confusing characters
   let code = ""
   for (let i = 0; i < 4; i++) {
     code += chars[Math.floor(Math.random() * chars.length)]
@@ -53,11 +63,13 @@ export function shuffle<T>(array: T[]): T[] {
 }
 
 // Initialize a new game
-export function initializeGame(playerIds: { id: string; name: string; isHost: boolean }[]): GameState {
+export function initializeGame(
+  playerIds: { id: string; name: string; isHost: boolean; playerCode?: string; email?: string }[],
+): GameState {
   const tiles = shuffle(createTileSet())
   const players: Player[] = []
 
-  for (const { id, name, isHost } of playerIds) {
+  for (const { id, name, isHost, playerCode, email } of playerIds) {
     const hand = tiles.splice(0, INITIAL_HAND_SIZE)
     players.push({
       id,
@@ -66,6 +78,8 @@ export function initializeGame(playerIds: { id: string; name: string; isHost: bo
       hand,
       hasInitialMeld: false,
       isConnected: true,
+      playerCode: playerCode || generatePlayerCode(),
+      email,
     })
   }
 

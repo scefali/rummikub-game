@@ -4,6 +4,7 @@ import { MAX_PLAYERS, MIN_PLAYERS } from "./game-types"
 import {
   generateRoomCode,
   generateId,
+  generatePlayerCode,
   initializeGame,
   drawTile,
   nextPlayer,
@@ -49,9 +50,10 @@ async function setRoom(room: Room): Promise<void> {
 export async function createRoom(
   playerName: string,
   playerEmail?: string,
-): Promise<{ roomCode: string; playerId: string; gameState: GameState }> {
+): Promise<{ roomCode: string; playerId: string; playerCode: string; gameState: GameState }> {
   const roomCode = generateRoomCode()
   const playerId = generateId()
+  const playerCode = generatePlayerCode()
 
   const player: Player = {
     id: playerId,
@@ -61,6 +63,7 @@ export async function createRoom(
     hasInitialMeld: false,
     isConnected: true,
     email: playerEmail || undefined,
+    playerCode,
   }
 
   const room: Room = {
@@ -81,14 +84,14 @@ export async function createRoom(
 
   await setRoom(room)
 
-  return { roomCode, playerId, gameState: room.gameState }
+  return { roomCode, playerId, playerCode, gameState: room.gameState }
 }
 
 export async function joinRoom(
   roomCode: string,
   playerName: string,
   playerEmail?: string,
-): Promise<{ success: boolean; playerId?: string; gameState?: GameState; error?: string }> {
+): Promise<{ success: boolean; playerId?: string; playerCode?: string; gameState?: GameState; error?: string }> {
   const code = roomCode.toUpperCase()
   const room = await getRoom(code)
 
@@ -105,6 +108,8 @@ export async function joinRoom(
   }
 
   const playerId = generateId()
+  const playerCode = generatePlayerCode()
+
   const player: Player = {
     id: playerId,
     name: playerName,
@@ -113,12 +118,36 @@ export async function joinRoom(
     hasInitialMeld: false,
     isConnected: true,
     email: playerEmail || undefined,
+    playerCode,
   }
 
   room.gameState.players.push(player)
   await setRoom(room)
 
-  return { success: true, playerId, gameState: room.gameState }
+  return { success: true, playerId, playerCode, gameState: room.gameState }
+}
+
+export async function loginWithCode(
+  roomCode: string,
+  playerCode: string,
+): Promise<{ success: boolean; playerId?: string; playerName?: string; error?: string }> {
+  const code = roomCode.toUpperCase()
+  const room = await getRoom(code)
+
+  if (!room) {
+    return { success: false, error: "Room not found" }
+  }
+
+  const player = room.gameState.players.find((p) => p.playerCode === playerCode.toUpperCase())
+  if (!player) {
+    return { success: false, error: "Invalid player code" }
+  }
+
+  // Mark player as connected
+  player.isConnected = true
+  await setRoom(room)
+
+  return { success: true, playerId: player.id, playerName: player.name }
 }
 
 export async function getGameState(roomCode: string, playerId: string): Promise<GameState | null> {
@@ -132,6 +161,7 @@ export async function getGameState(roomCode: string, playerId: string): Promise<
       ...p,
       hand: p.id === playerId ? p.hand : [],
       handCount: p.hand.length,
+      playerCode: p.id === playerId ? p.playerCode : undefined,
     })) as Player[],
   }
 }
@@ -156,6 +186,8 @@ export async function startGame(
     id: p.id,
     name: p.name,
     isHost: p.isHost,
+    playerCode: p.playerCode,
+    email: p.email,
   }))
 
   room.gameState = initializeGame(playerData)
@@ -197,7 +229,12 @@ export async function playTiles(
 export async function handleDrawTile(
   roomCode: string,
   playerId: string,
-): Promise<{ success: boolean; drawnTile?: Tile; error?: string; nextPlayer?: { name: string; email?: string } }> {
+): Promise<{
+  success: boolean
+  drawnTile?: Tile
+  error?: string
+  nextPlayer?: { name: string; email?: string; playerCode?: string }
+}> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
     return { success: false, error: "Game not in progress" }
@@ -232,6 +269,7 @@ export async function handleDrawTile(
     nextPlayer: {
       name: nextPlayerObj.name,
       email: nextPlayerObj.email,
+      playerCode: nextPlayerObj.playerCode,
     },
   }
 }
@@ -244,7 +282,7 @@ export async function handleEndTurn(
   error?: string
   gameEnded?: boolean
   winner?: string
-  nextPlayer?: { name: string; email?: string }
+  nextPlayer?: { name: string; email?: string; playerCode?: string }
 }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -293,6 +331,7 @@ export async function handleEndTurn(
     nextPlayer: {
       name: nextPlayerObj.name,
       email: nextPlayerObj.email,
+      playerCode: nextPlayerObj.playerCode,
     },
   }
 }

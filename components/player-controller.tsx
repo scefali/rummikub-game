@@ -24,6 +24,7 @@ import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
+import { PlayerCodeDisplay } from "@/components/player-code-display"
 import { generateId, isValidMeld, calculateProcessedMeldPoints, processMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -63,6 +64,7 @@ export function PlayerController({
   const myHand = myPlayer?.hand || []
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
+  const myPlayerCode = myPlayer?.playerCode
 
   const sortedHand = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
@@ -263,6 +265,7 @@ export function PlayerController({
           </Badge>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          {myPlayerCode && <PlayerCodeDisplay playerCode={myPlayerCode} />}
           <Button
             variant="ghost"
             size="sm"

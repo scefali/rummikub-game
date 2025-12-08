@@ -26,6 +26,7 @@ export interface Player {
   hasInitialMeld: boolean // Has placed 30+ points initially
   isConnected: boolean
   email?: string // Optional email field
+  playerCode: string // 6-character code for cross-device login
 }
 
 // Game phases

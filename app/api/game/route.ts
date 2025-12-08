@@ -5,7 +5,7 @@ import { sendTurnNotificationEmail } from "@/lib/email"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, roomCode, playerId, playerName, playerEmail, melds, hand, workingArea } = body
+    const { action, roomCode, playerId, playerName, playerEmail, playerCode, melds, hand, workingArea } = body
 
     console.log("[v0] API Request:", { action, roomCode, playerName, playerId: playerId?.slice(0, 8) })
 
@@ -13,7 +13,12 @@ export async function POST(request: NextRequest) {
       case "create_room": {
         const result = await gameStore.createRoom(playerName, playerEmail)
         console.log("[v0] Room created:", { roomCode: result.roomCode, playerId: result.playerId?.slice(0, 8) })
-        return NextResponse.json(result)
+        return NextResponse.json({
+          roomCode: result.roomCode,
+          playerId: result.playerId,
+          playerCode: result.playerCode,
+          gameState: result.gameState,
+        })
       }
 
       case "join_room": {
@@ -23,7 +28,25 @@ export async function POST(request: NextRequest) {
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
-        return NextResponse.json(result)
+        return NextResponse.json({
+          success: true,
+          playerId: result.playerId,
+          playerCode: result.playerCode,
+          gameState: result.gameState,
+        })
+      }
+
+      case "login_with_code": {
+        console.log("[v0] Attempting login with code:", roomCode, playerCode)
+        const result = await gameStore.loginWithCode(roomCode, playerCode)
+        if (!result.success) {
+          return NextResponse.json({ error: result.error }, { status: 400 })
+        }
+        return NextResponse.json({
+          success: true,
+          playerId: result.playerId,
+          playerName: result.playerName,
+        })
       }
 
       case "get_state": {
@@ -56,10 +79,13 @@ export async function POST(request: NextRequest) {
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
-        if (result.nextPlayer?.email) {
-          sendTurnNotificationEmail(result.nextPlayer.email, result.nextPlayer.name, roomCode).catch((err) =>
-            console.error("[v0] Email send failed:", err),
-          )
+        if (result.nextPlayer?.email && result.nextPlayer?.playerCode) {
+          sendTurnNotificationEmail(
+            result.nextPlayer.email,
+            result.nextPlayer.name,
+            roomCode,
+            result.nextPlayer.playerCode,
+          ).catch((err) => console.error("[v0] Email send failed:", err))
         }
         return NextResponse.json({ success: true, drawnTile: result.drawnTile })
       }
@@ -69,10 +95,13 @@ export async function POST(request: NextRequest) {
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
-        if (result.nextPlayer?.email) {
-          sendTurnNotificationEmail(result.nextPlayer.email, result.nextPlayer.name, roomCode).catch((err) =>
-            console.error("[v0] Email send failed:", err),
-          )
+        if (result.nextPlayer?.email && result.nextPlayer?.playerCode) {
+          sendTurnNotificationEmail(
+            result.nextPlayer.email,
+            result.nextPlayer.name,
+            roomCode,
+            result.nextPlayer.playerCode,
+          ).catch((err) => console.error("[v0] Email send failed:", err))
         }
         return NextResponse.json({ success: true, gameEnded: result.gameEnded, winner: result.winner })
       }
