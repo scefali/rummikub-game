@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
             roomCode,
             result.nextPlayer.playerCode,
             result.playerStandings,
+            result.roomStyleId,
           ).catch((err) => console.error("[v0] Email send failed:", err))
         }
         return NextResponse.json({ success: true, drawnTile: result.drawnTile })
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
             roomCode,
             result.nextPlayer.playerCode,
             result.playerStandings,
+            result.roomStyleId,
           ).catch((err) => console.error("[v0] Email send failed:", err))
         }
         return NextResponse.json({ success: true, gameEnded: result.gameEnded, winner: result.winner })

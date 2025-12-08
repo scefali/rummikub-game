@@ -255,6 +255,7 @@ export async function handleDrawTile(
   error?: string
   nextPlayer?: { name: string; email?: string; playerCode?: string }
   playerStandings?: { name: string; tileCount: number }[]
+  roomStyleId?: RoomStyleId
 }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -298,6 +299,7 @@ export async function handleDrawTile(
       playerCode: nextPlayerObj.playerCode,
     },
     playerStandings,
+    roomStyleId: room.roomStyleId,
   }
 }
 
@@ -311,6 +313,7 @@ export async function handleEndTurn(
   winner?: string
   nextPlayer?: { name: string; email?: string; playerCode?: string }
   playerStandings?: { name: string; tileCount: number }[]
+  roomStyleId?: RoomStyleId
 }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -368,6 +371,7 @@ export async function handleEndTurn(
       playerCode: nextPlayerObj.playerCode,
     },
     playerStandings,
+    roomStyleId: room.roomStyleId,
   }
 }
 
