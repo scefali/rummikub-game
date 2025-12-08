@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Check, Crown, Users, Loader2 } from "lucide-react"
+import { Copy, Check, Crown, Users, Loader2, Share2 } from "lucide-react"
 import { useState } from "react"
 import type { GameState } from "@/lib/game-types"
 import { MIN_PLAYERS, MAX_PLAYERS } from "@/lib/game-types"
@@ -18,6 +18,7 @@ interface LobbyScreenProps {
 
 export function LobbyScreen({ roomCode, playerId, gameState, onStartGame, onLeave }: LobbyScreenProps) {
   const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const currentPlayer = gameState.players.find((p) => p.id === playerId)
   const isHost = currentPlayer?.isHost ?? false
@@ -41,6 +42,40 @@ export function LobbyScreen({ roomCode, playerId, gameState, onStartGame, onLeav
     }
   }
 
+  const shareGameLink = async () => {
+    const gameUrl = `${window.location.origin}/game/${roomCode}`
+
+    // Try native share API first (works great on mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Join my Rummikub game!",
+          text: `Join my Rummikub game with code ${roomCode}`,
+          url: gameUrl,
+        })
+        return
+      } catch (err) {
+        // User cancelled or share failed, fall back to clipboard
+      }
+    }
+
+    // Fall back to clipboard
+    try {
+      await navigator.clipboard.writeText(gameUrl)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      const textArea = document.createElement("textarea")
+      textArea.value = gameUrl
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textArea)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-background to-secondary/20">
       {/* Room Code Display */}
@@ -55,7 +90,21 @@ export function LobbyScreen({ roomCode, playerId, gameState, onStartGame, onLeav
               {copied ? <Check className="w-5 h-5 text-primary" /> : <Copy className="w-5 h-5" />}
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">Share this code with friends to join</p>
+          <p className="text-sm text-muted-foreground mb-4">Share this code with friends to join</p>
+          {/* Share Game Link Button */}
+          <Button variant="outline" onClick={shareGameLink} className="gap-2 bg-transparent">
+            {linkCopied ? (
+              <>
+                <Check className="w-4 h-4" />
+                Link Copied!
+              </>
+            ) : (
+              <>
+                <Share2 className="w-4 h-4" />
+                Share Game Link
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
 
