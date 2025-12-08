@@ -385,3 +385,28 @@ export function canEndTurn(
 
   return { valid: true }
 }
+
+export function findValidSplitPoint(meld: Meld): number | null {
+  // Only runs can be split, and need at least 6 tiles to make two valid melds of 3
+  if (!isValidRun(meld.tiles) || meld.tiles.length < 6) return null
+
+  // Process the meld to get proper tile order
+  const processed = processMeld(meld)
+
+  // Find first split point that creates two valid melds (each with 3+ tiles)
+  // Start from position 3 (minimum size for first meld)
+  for (let splitAt = 3; splitAt <= processed.tiles.length - 3; splitAt++) {
+    const firstPart = processed.tiles.slice(0, splitAt)
+    const secondPart = processed.tiles.slice(splitAt)
+
+    // Check if both parts would be valid melds
+    const firstMeld: Meld = { id: "temp1", tiles: firstPart }
+    const secondMeld: Meld = { id: "temp2", tiles: secondPart }
+
+    if (isValidMeld(firstMeld) && isValidMeld(secondMeld)) {
+      return splitAt
+    }
+  }
+
+  return null
+}

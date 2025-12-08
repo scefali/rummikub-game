@@ -27,7 +27,13 @@ import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
-import { generateId, isValidMeld, calculateProcessedMeldPoints, processMeld } from "@/lib/game-logic"
+import {
+  generateId,
+  isValidMeld,
+  calculateProcessedMeldPoints,
+  processMeld,
+  findValidSplitPoint,
+} from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface PlayerControllerProps {
@@ -218,6 +224,30 @@ export function PlayerController({
       onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
 
       setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
+    },
+    [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
+  )
+
+  const splitMeld = useCallback(
+    (meldId: string) => {
+      if (!canUseTableTiles) return
+
+      const meld = gameState.melds.find((m) => m.id === meldId)
+      if (!meld) return
+
+      const splitPoint = findValidSplitPoint(meld)
+      if (splitPoint === null) return
+
+      // Process to get correct tile order
+      const processed = processMeld(meld)
+      const firstPart = processed.tiles.slice(0, splitPoint)
+      const secondPart = processed.tiles.slice(splitPoint)
+
+      const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
+      updatedMelds.push({ id: generateId(), tiles: firstPart })
+      updatedMelds.push({ id: generateId(), tiles: secondPart })
+
+      onPlayTiles(updatedMelds, myHand, workingArea)
     },
     [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
@@ -421,6 +451,7 @@ export function PlayerController({
                   onTileClick={isMyTurn && canUseTableTiles ? takeTileFromMeld : undefined}
                   onAddTile={isMyTurn ? addToMeld : undefined}
                   onDeleteMeld={isMyTurn && canUseTableTiles ? breakMeld : undefined}
+                  onSplitMeld={isMyTurn && canUseTableTiles ? splitMeld : undefined}
                   compact
                   newTileIds={newTileIds}
                   hidePoints={allPlayersStarted} // Hide points when all players have started
