@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -47,6 +47,18 @@ export function GameBoard({
   const myHand = myPlayer?.hand || []
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
+  const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedTiles(new Set())
+        setSelectedWorkingTiles(new Set())
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
 
   const sortedTiles = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
@@ -400,7 +412,7 @@ export function GameBoard({
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Hand</h3>
               {!myPlayer.hasInitialMeld && (
                 <Badge variant="default" className="text-xs">
-                  Need 30+ pts for first meld
+                  Need {initialMeldThreshold}+ pts for first meld
                 </Badge>
               )}
             </div>

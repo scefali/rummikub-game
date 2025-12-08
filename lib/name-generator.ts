@@ -1,0 +1,73 @@
+// Fun adjectives for name generation
+const adjectives = [
+  "Happy",
+  "Clever",
+  "Swift",
+  "Brave",
+  "Calm",
+  "Eager",
+  "Fancy",
+  "Gentle",
+  "Jolly",
+  "Kind",
+  "Lively",
+  "Merry",
+  "Noble",
+  "Proud",
+  "Quick",
+  "Royal",
+  "Shiny",
+  "Snappy",
+  "Sunny",
+  "Witty",
+  "Zesty",
+  "Bold",
+  "Daring",
+  "Epic",
+  "Lucky",
+  "Mighty",
+  "Peppy",
+  "Plucky",
+  "Spry",
+  "Zippy",
+]
+
+// Fun animals/characters for name generation
+const nouns = [
+  "Panda",
+  "Tiger",
+  "Falcon",
+  "Dragon",
+  "Phoenix",
+  "Otter",
+  "Fox",
+  "Wolf",
+  "Bear",
+  "Eagle",
+  "Hawk",
+  "Lion",
+  "Owl",
+  "Raven",
+  "Shark",
+  "Whale",
+  "Koala",
+  "Lemur",
+  "Penguin",
+  "Raccoon",
+  "Badger",
+  "Dolphin",
+  "Jaguar",
+  "Panther",
+  "Cobra",
+  "Viper",
+  "Rhino",
+  "Hippo",
+  "Giraffe",
+  "Zebra",
+]
+
+export function generateRandomName(): string {
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)]
+  const noun = nouns[Math.floor(Math.random() * nouns.length)]
+  return `${adjective}${noun}`
+}

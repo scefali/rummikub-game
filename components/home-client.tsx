@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Sparkles, Mail, KeyRound } from "lucide-react"
+import { Users, Sparkles, Mail, KeyRound, Shuffle } from "lucide-react"
 import { setPlayerCookie } from "@/lib/cookies"
+import { generateRandomName } from "@/lib/name-generator"
 
 interface HomeClientProps {
   joinCode?: string
@@ -22,10 +23,18 @@ export function HomeClient({ joinCode }: HomeClientProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const getNameOrGenerate = () => {
+    if (playerName.trim()) return playerName.trim()
+    const generated = generateRandomName()
+    setPlayerName(generated)
+    return generated
+  }
+
   const handleCreate = async () => {
-    if (!playerName.trim()) return
     setIsLoading(true)
     setError(null)
+
+    const name = getNameOrGenerate()
 
     try {
       const response = await fetch("/api/game", {
@@ -33,7 +42,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create_room",
-          playerName: playerName.trim(),
+          playerName: name,
           playerEmail: playerEmail.trim() || undefined,
         }),
       })
@@ -43,9 +52,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
         throw new Error(data.error || "Failed to create room")
       }
 
-      // Set cookie with player info
-      await setPlayerCookie(data.playerId, playerName.trim(), data.roomCode)
-
+      await setPlayerCookie(data.playerId, name, data.roomCode)
       router.push(`/game/${data.roomCode}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room")
@@ -54,11 +61,12 @@ export function HomeClient({ joinCode }: HomeClientProps) {
   }
 
   const handleJoin = async () => {
-    if (!playerName.trim() || !roomCode.trim()) return
+    if (!roomCode.trim()) return
     setIsLoading(true)
     setError(null)
 
     const code = roomCode.trim().toUpperCase()
+    const name = getNameOrGenerate()
 
     try {
       const response = await fetch("/api/game", {
@@ -67,7 +75,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
         body: JSON.stringify({
           action: "join_room",
           roomCode: code,
-          playerName: playerName.trim(),
+          playerName: name,
           playerEmail: playerEmail.trim() || undefined,
         }),
       })
@@ -77,9 +85,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
         throw new Error(data.error || "Failed to join room")
       }
 
-      // Set cookie with player info
-      await setPlayerCookie(data.playerId, playerName.trim(), code)
-
+      await setPlayerCookie(data.playerId, name, code)
       router.push(`/game/${code}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join room")
@@ -119,6 +125,10 @@ export function HomeClient({ joinCode }: HomeClientProps) {
       setError(err instanceof Error ? err.message : "Failed to login")
       setIsLoading(false)
     }
+  }
+
+  const handleGenerateName = () => {
+    setPlayerName(generateRandomName())
   }
 
   return (
@@ -170,18 +180,30 @@ export function HomeClient({ joinCode }: HomeClientProps) {
               {/* Name Input */}
               <div>
                 <label htmlFor="playerNameCreate" className="block text-sm font-medium text-muted-foreground mb-2">
-                  Your Name
+                  Your Name <span className="text-muted-foreground/60">(optional)</span>
                 </label>
-                <Input
-                  id="playerNameCreate"
-                  placeholder="Enter your name"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  maxLength={20}
-                  className="bg-input/50"
-                  autoComplete="name"
-                  name="name"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="playerNameCreate"
+                    placeholder="Leave blank for random name"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    maxLength={20}
+                    className="bg-input/50 flex-1"
+                    autoComplete="name"
+                    name="name"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleGenerateName}
+                    title="Generate random name"
+                    className="shrink-0 cursor-pointer bg-transparent"
+                  >
+                    <Shuffle className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
 
               <div>
@@ -208,7 +230,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
               </p>
               <Button
                 onClick={handleCreate}
-                disabled={!playerName.trim() || isLoading}
+                disabled={isLoading}
                 className="w-full h-12 text-lg font-semibold cursor-pointer"
               >
                 {isLoading ? "Creating..." : "Create Room"}
@@ -219,18 +241,30 @@ export function HomeClient({ joinCode }: HomeClientProps) {
               {/* Name Input */}
               <div>
                 <label htmlFor="playerNameJoin" className="block text-sm font-medium text-muted-foreground mb-2">
-                  Your Name
+                  Your Name <span className="text-muted-foreground/60">(optional)</span>
                 </label>
-                <Input
-                  id="playerNameJoin"
-                  placeholder="Enter your name"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  maxLength={20}
-                  className="bg-input/50"
-                  autoComplete="name"
-                  name="name"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="playerNameJoin"
+                    placeholder="Leave blank for random name"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    maxLength={20}
+                    className="bg-input/50 flex-1"
+                    autoComplete="name"
+                    name="name"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleGenerateName}
+                    title="Generate random name"
+                    className="shrink-0 cursor-pointer bg-transparent"
+                  >
+                    <Shuffle className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
 
               <div>
@@ -267,7 +301,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
               </div>
               <Button
                 onClick={handleJoin}
-                disabled={!playerName.trim() || !roomCode.trim() || isLoading}
+                disabled={!roomCode.trim() || isLoading}
                 className="w-full h-12 text-lg font-semibold cursor-pointer"
               >
                 {isLoading ? "Joining..." : "Join Room"}
@@ -275,6 +309,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
             </TabsContent>
 
             <TabsContent value="login" className="space-y-4">
+              {/* Continue playing on a different device using your player code */}
               <p className="text-sm text-muted-foreground text-center">
                 Continue playing on a different device using your player code
               </p>
@@ -330,7 +365,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
       </Card>
 
       {/* Footer */}
-      <p className="mt-8 text-sm text-muted-foreground">2-4 players • Works on all devices</p>
+      <p className="mt-8 text-sm text-muted-foreground">2-6 players • Works on all devices</p>
     </div>
   )
 }
