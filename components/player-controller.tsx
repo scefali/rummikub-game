@@ -441,7 +441,7 @@ export function PlayerController({
               <p className="text-muted-foreground text-center text-xs">No melds yet - select tiles to create one</p>
             </Card>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {gameState.melds.map((meld) => (
                 <MeldDisplay
                   key={meld.id}

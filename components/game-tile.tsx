@@ -14,9 +14,9 @@ interface GameTileProps {
 }
 
 const sizeClasses = {
-  sm: "w-8 h-10 text-sm",
+  sm: "w-7 h-9 text-sm",
   md: "w-10 h-14 text-base",
-  lg: "w-12 h-16 text-lg",
+  lg: "w-14 h-[72px] text-xl",
 }
 
 const colorClasses = {
