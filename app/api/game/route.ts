@@ -1,23 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
 import * as gameStore from "@/lib/game-store"
+import { sendTurnNotificationEmail } from "@/lib/email"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, roomCode, playerId, playerName, melds, hand, workingArea } = body
+    const { action, roomCode, playerId, playerName, playerEmail, melds, hand, workingArea } = body
 
     console.log("[v0] API Request:", { action, roomCode, playerName, playerId: playerId?.slice(0, 8) })
 
     switch (action) {
       case "create_room": {
-        const result = await gameStore.createRoom(playerName)
+        const result = await gameStore.createRoom(playerName, playerEmail)
         console.log("[v0] Room created:", { roomCode: result.roomCode, playerId: result.playerId?.slice(0, 8) })
         return NextResponse.json(result)
       }
 
       case "join_room": {
         console.log("[v0] Attempting to join room:", roomCode)
-        const result = await gameStore.joinRoom(roomCode, playerName)
+        const result = await gameStore.joinRoom(roomCode, playerName, playerEmail)
         console.log("[v0] Join result:", { success: result.success, error: result.error })
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
@@ -55,6 +56,11 @@ export async function POST(request: NextRequest) {
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
+        if (result.nextPlayer?.email) {
+          sendTurnNotificationEmail(result.nextPlayer.email, result.nextPlayer.name, roomCode).catch((err) =>
+            console.error("[v0] Email send failed:", err),
+          )
+        }
         return NextResponse.json({ success: true, drawnTile: result.drawnTile })
       }
 
@@ -62,6 +68,11 @@ export async function POST(request: NextRequest) {
         const result = await gameStore.handleEndTurn(roomCode, playerId)
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
+        }
+        if (result.nextPlayer?.email) {
+          sendTurnNotificationEmail(result.nextPlayer.email, result.nextPlayer.name, roomCode).catch((err) =>
+            console.error("[v0] Email send failed:", err),
+          )
         }
         return NextResponse.json({ success: true, gameEnded: result.gameEnded, winner: result.winner })
       }

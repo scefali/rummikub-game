@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Sparkles } from "lucide-react"
+import { Users, Sparkles, Mail } from "lucide-react"
 import { setPlayerCookie } from "@/lib/cookies"
 
 interface HomeClientProps {
@@ -16,6 +16,7 @@ interface HomeClientProps {
 export function HomeClient({ joinCode }: HomeClientProps) {
   const router = useRouter()
   const [playerName, setPlayerName] = useState("")
+  const [playerEmail, setPlayerEmail] = useState("")
   const [roomCode, setRoomCode] = useState(joinCode || "")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +30,11 @@ export function HomeClient({ joinCode }: HomeClientProps) {
       const response = await fetch("/api/game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create_room", playerName: playerName.trim() }),
+        body: JSON.stringify({
+          action: "create_room",
+          playerName: playerName.trim(),
+          playerEmail: playerEmail.trim() || undefined,
+        }),
       })
       const data = await response.json()
 
@@ -58,7 +63,12 @@ export function HomeClient({ joinCode }: HomeClientProps) {
       const response = await fetch("/api/game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "join_room", roomCode: code, playerName: playerName.trim() }),
+        body: JSON.stringify({
+          action: "join_room",
+          roomCode: code,
+          playerName: playerName.trim(),
+          playerEmail: playerEmail.trim() || undefined,
+        }),
       })
       const data = await response.json()
 
@@ -105,7 +115,7 @@ export function HomeClient({ joinCode }: HomeClientProps) {
         </CardHeader>
         <CardContent>
           {/* Name Input */}
-          <div className="mb-6">
+          <div className="mb-4">
             <label htmlFor="playerName" className="block text-sm font-medium text-muted-foreground mb-2">
               Your Name
             </label>
@@ -117,6 +127,24 @@ export function HomeClient({ joinCode }: HomeClientProps) {
               maxLength={20}
               className="bg-input/50"
             />
+          </div>
+
+          <div className="mb-6">
+            <label htmlFor="playerEmail" className="block text-sm font-medium text-muted-foreground mb-2">
+              <span className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email <span className="text-muted-foreground/60">(optional)</span>
+              </span>
+            </label>
+            <Input
+              id="playerEmail"
+              type="email"
+              placeholder="Get notified when it's your turn"
+              value={playerEmail}
+              onChange={(e) => setPlayerEmail(e.target.value)}
+              className="bg-input/50"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Receive an email when it's your turn to play</p>
           </div>
 
           {/* Tabs for Create/Join */}

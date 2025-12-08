@@ -25,6 +25,7 @@ export interface Player {
   hand: Tile[]
   hasInitialMeld: boolean // Has placed 30+ points initially
   isConnected: boolean
+  email?: string // Optional email field
 }
 
 // Game phases

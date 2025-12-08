@@ -16,8 +16,7 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN!,
 })
 
-// Room keys expire after 2 hours
-const ROOM_TTL = 2 * 60 * 60
+const ROOM_TTL = 30 * 24 * 60 * 60 // 30 days
 
 function roomKey(code: string): string {
   return `room:${code.toUpperCase()}`
@@ -49,6 +48,7 @@ async function setRoom(room: Room): Promise<void> {
 
 export async function createRoom(
   playerName: string,
+  playerEmail?: string,
 ): Promise<{ roomCode: string; playerId: string; gameState: GameState }> {
   const roomCode = generateRoomCode()
   const playerId = generateId()
@@ -60,6 +60,7 @@ export async function createRoom(
     hand: [],
     hasInitialMeld: false,
     isConnected: true,
+    email: playerEmail || undefined,
   }
 
   const room: Room = {
@@ -86,6 +87,7 @@ export async function createRoom(
 export async function joinRoom(
   roomCode: string,
   playerName: string,
+  playerEmail?: string,
 ): Promise<{ success: boolean; playerId?: string; gameState?: GameState; error?: string }> {
   const code = roomCode.toUpperCase()
   const room = await getRoom(code)
@@ -110,6 +112,7 @@ export async function joinRoom(
     hand: [],
     hasInitialMeld: false,
     isConnected: true,
+    email: playerEmail || undefined,
   }
 
   room.gameState.players.push(player)
@@ -194,7 +197,7 @@ export async function playTiles(
 export async function handleDrawTile(
   roomCode: string,
   playerId: string,
-): Promise<{ success: boolean; drawnTile?: Tile; error?: string }> {
+): Promise<{ success: boolean; drawnTile?: Tile; error?: string; nextPlayer?: { name: string; email?: string } }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
     return { success: false, error: "Game not in progress" }
@@ -223,13 +226,26 @@ export async function handleDrawTile(
 
   await setRoom(room)
 
-  return { success: true, drawnTile: tile || undefined }
+  return {
+    success: true,
+    drawnTile: tile || undefined,
+    nextPlayer: {
+      name: nextPlayerObj.name,
+      email: nextPlayerObj.email,
+    },
+  }
 }
 
 export async function handleEndTurn(
   roomCode: string,
   playerId: string,
-): Promise<{ success: boolean; error?: string; gameEnded?: boolean; winner?: string }> {
+): Promise<{
+  success: boolean
+  error?: string
+  gameEnded?: boolean
+  winner?: string
+  nextPlayer?: { name: string; email?: string }
+}> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
     return { success: false, error: "Game not in progress" }
@@ -272,7 +288,13 @@ export async function handleEndTurn(
 
   await setRoom(room)
 
-  return { success: true }
+  return {
+    success: true,
+    nextPlayer: {
+      name: nextPlayerObj.name,
+      email: nextPlayerObj.email,
+    },
+  }
 }
 
 export async function resetTurn(roomCode: string, playerId: string): Promise<{ success: boolean; error?: string }> {

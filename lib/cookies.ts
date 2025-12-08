@@ -3,7 +3,7 @@
 import { cookies } from "next/headers"
 
 const COOKIE_NAME = "rummikub_player"
-const COOKIE_MAX_AGE = 60 * 60 * 2 // 2 hours
+const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
 
 interface PlayerCookie {
   odId: string

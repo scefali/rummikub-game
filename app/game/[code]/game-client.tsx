@@ -8,6 +8,7 @@ import { PlayerController } from "@/components/player-controller"
 import { GameEndScreen } from "@/components/game-end-screen"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { clearPlayerCookie } from "@/lib/cookies"
+import { showTurnNotification } from "@/lib/notifications"
 import type { GameState, Meld, Tile } from "@/lib/game-types"
 import { Loader2 } from "lucide-react"
 
@@ -28,6 +29,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const isPollingRef = useRef(false)
   const errorSetTimeRef = useRef<number>(0)
+  const lastNotifiedTurnRef = useRef<number>(-1)
 
   // API call helper
   const apiCall = useCallback(async (body: Record<string, unknown>) => {
@@ -54,7 +56,21 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         roomCode,
         playerId,
       })
-      setGameState(data.gameState)
+      const newGameState = data.gameState as GameState
+
+      if (newGameState.phase === "playing") {
+        const currentPlayerIndex = newGameState.currentPlayerIndex
+        const currentPlayer = newGameState.players[currentPlayerIndex]
+        const isMyTurn = currentPlayer?.id === playerId
+
+        // Only notify once per turn change
+        if (isMyTurn && lastNotifiedTurnRef.current !== currentPlayerIndex) {
+          lastNotifiedTurnRef.current = currentPlayerIndex
+          showTurnNotification(playerName, roomCode)
+        }
+      }
+
+      setGameState(newGameState)
       if (Date.now() - errorSetTimeRef.current > 3000) {
         setError(null)
       }
@@ -68,7 +84,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     } finally {
       isPollingRef.current = false
     }
-  }, [roomCode, playerId, apiCall, router])
+  }, [roomCode, playerId, playerName, apiCall, router])
 
   // Start polling on mount
   useEffect(() => {
