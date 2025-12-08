@@ -72,6 +72,15 @@ export function GameBoard({
 
   const currentStyle = ROOM_STYLES[roomStyleId]
 
+  const allPlayersStarted = gameState.players.every((p) => p.hasInitialMeld)
+
+  useEffect(() => {
+    if (!isMyTurn) {
+      setSelectedTiles(new Set())
+      setSelectedWorkingTiles(new Set())
+    }
+  }, [isMyTurn])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -372,6 +381,7 @@ export function GameBoard({
                 onAddTile={isMyTurn ? addToMeld : undefined}
                 onDeleteMeld={isMyTurn && canUseTableTiles ? breakMeld : undefined}
                 newTileIds={newTileIds}
+                hidePoints={allPlayersStarted} // Hide points when all players have started
               />
             ))}
 

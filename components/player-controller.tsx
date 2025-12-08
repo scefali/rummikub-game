@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
@@ -21,12 +21,11 @@ import {
   Settings,
 } from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
-import { STANDARD_MELD_POINTS, ROOM_STYLES } from "@/lib/game-types"
+import { ROOM_STYLES } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
-import { PlayerCodeDisplay } from "@/components/player-code-display"
 import { SettingsModal } from "@/components/settings-modal"
 import { generateId, isValidMeld, calculateProcessedMeldPoints, processMeld } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
@@ -77,6 +76,8 @@ export function PlayerController({
   const myPlayerCode = myPlayer?.playerCode
 
   const currentStyle = ROOM_STYLES[roomStyleId]
+
+  const allPlayersStarted = gameState.players.every((p) => p.hasInitialMeld)
 
   const sortedHand = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
@@ -249,7 +250,7 @@ export function PlayerController({
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
 
-  const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? STANDARD_MELD_POINTS
+  const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
 
   const hasChangesToReset =
     workingArea.length > 0 ||
@@ -266,6 +267,29 @@ export function PlayerController({
       }
     })
   })
+
+  useEffect(() => {
+    if (!isMyTurn) {
+      setSelectedTiles(new Set())
+      setSelectedWorkingTiles(new Set())
+    }
+  }, [isMyTurn])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {}
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isMyTurn) {
+      clearSelection()
+    }
+  }, [isMyTurn, clearSelection])
 
   return (
     <div className={cn("h-dvh flex flex-col overflow-hidden", currentStyle.background)}>
@@ -287,7 +311,6 @@ export function PlayerController({
           </Badge>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          {myPlayerCode && <PlayerCodeDisplay playerCode={myPlayerCode} />}
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowSettingsModal(true)}>
             <Settings className="w-4 h-4" />
           </Button>
@@ -400,6 +423,7 @@ export function PlayerController({
                   onDeleteMeld={isMyTurn && canUseTableTiles ? breakMeld : undefined}
                   compact
                   newTileIds={newTileIds}
+                  hidePoints={allPlayersStarted} // Hide points when all players have started
                 />
               ))}
             </div>

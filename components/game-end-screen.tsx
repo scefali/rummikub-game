@@ -71,7 +71,7 @@ export function GameEndScreen({ gameState, playerId, roomStyleId, onPlayAgain }:
                 </div>
                 <div className="text-right">
                   <span className="text-muted-foreground text-sm">
-                    {player.remainingPoints === 0 ? (
+                    {player.id === gameState.winner ? (
                       <span className="text-primary font-semibold">Winner!</span>
                     ) : (
                       `${player.remainingPoints} pts left`

@@ -18,6 +18,7 @@ interface MeldDisplayProps {
   hasSelectedTiles?: boolean
   compact?: boolean
   newTileIds?: Set<string>
+  hidePoints?: boolean // Add prop to hide points badge
 }
 
 export function MeldDisplay({
@@ -29,6 +30,7 @@ export function MeldDisplay({
   hasSelectedTiles = false,
   compact = false,
   newTileIds,
+  hidePoints = false, // Default to showing points
 }: MeldDisplayProps) {
   const isValid = isValidMeld(meld)
   const processedMeld = isValid ? processMeld(meld) : meld
@@ -70,12 +72,14 @@ export function MeldDisplay({
       <div className="flex items-center justify-between gap-1 px-0.5">
         <div className="flex items-center gap-1">
           {isValid ? (
-            <Badge
-              variant="secondary"
-              className={cn("bg-primary/20 text-primary", compact ? "text-[10px] px-1.5 py-0" : "text-xs")}
-            >
-              {points} pts
-            </Badge>
+            !hidePoints && (
+              <Badge
+                variant="secondary"
+                className={cn("bg-primary/20 text-primary", compact ? "text-[10px] px-1.5 py-0" : "text-xs")}
+              >
+                {points} pts
+              </Badge>
+            )
           ) : (
             <Badge variant="destructive" className={cn(compact ? "text-[10px] px-1.5 py-0" : "text-xs")}>
               Invalid

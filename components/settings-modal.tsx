@@ -55,39 +55,42 @@ export function SettingsModal({ isOpen, onClose, roomStyleId, onStyleChange, isH
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-md p-6 bg-card border-border max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-foreground">Settings</h2>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+      <Card className="w-full sm:max-w-md p-4 sm:p-6 bg-card border-border max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-xl">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-bold text-foreground">Settings</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           {roomStyleId && onStyleChange && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Room Background</h3>
 
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
                 {Object.values(ROOM_STYLES).map((style) => (
                   <button
                     key={style.id}
                     onClick={() => isHost && onStyleChange(style.id)}
                     disabled={!isHost}
                     className={cn(
-                      "flex items-center justify-between p-3 rounded-lg border transition-all",
+                      "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border transition-all",
+                      "sm:justify-between",
                       style.id === roomStyleId
                         ? "border-primary bg-primary/10"
                         : "border-border hover:border-primary/50",
                       !isHost && "opacity-60 cursor-not-allowed",
                     )}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-8 h-8 rounded-md", style.background)} />
-                      <span className="font-medium text-foreground">{style.name}</span>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className={cn("w-6 h-6 sm:w-8 sm:h-8 rounded-md flex-shrink-0", style.background)} />
+                      <span className="font-medium text-foreground text-sm sm:text-base truncate">{style.name}</span>
                     </div>
-                    {style.id === roomStyleId && <Check className="w-5 h-5 text-primary" />}
+                    {style.id === roomStyleId && (
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 text-primary hidden sm:block" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -97,26 +100,26 @@ export function SettingsModal({ isOpen, onClose, roomStyleId, onStyleChange, isH
           )}
 
           {/* Sound Settings */}
-          <div className={cn("space-y-4", roomStyleId && "pt-4 border-t border-border")}>
+          <div className={cn("space-y-3 sm:space-y-4", roomStyleId && "pt-4 border-t border-border")}>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sound</h3>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 {settings.soundEnabled ? (
-                  <Volume2 className="w-5 h-5 text-primary" />
+                  <Volume2 className="w-5 h-5 text-primary flex-shrink-0" />
                 ) : (
-                  <VolumeX className="w-5 h-5 text-muted-foreground" />
+                  <VolumeX className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 )}
-                <div>
-                  <p className="font-medium text-foreground">Turn Notification Sound</p>
-                  <p className="text-sm text-muted-foreground">Play a sound when it&apos;s your turn</p>
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground text-sm sm:text-base">Turn Sound</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Play when it&apos;s your turn</p>
                 </div>
               </div>
               <Switch checked={settings.soundEnabled} onCheckedChange={handleSoundToggle} />
             </div>
 
             {settings.soundEnabled && (
-              <div className="pl-8 space-y-2">
+              <div className="pl-7 sm:pl-8 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Volume</span>
                   <span className="text-sm text-muted-foreground">{Math.round(settings.soundVolume * 100)}%</span>
@@ -138,20 +141,20 @@ export function SettingsModal({ isOpen, onClose, roomStyleId, onStyleChange, isH
           </div>
 
           {/* Push Notifications */}
-          <div className="space-y-4 pt-4 border-t border-border">
+          <div className="space-y-3 sm:space-y-4 pt-4 border-t border-border">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Push Notifications</h3>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Bell className="w-5 h-5 text-primary" />
-                <div>
-                  <p className="font-medium text-foreground">Browser Notifications</p>
-                  <p className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <Bell className="w-5 h-5 text-primary flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground text-sm sm:text-base">Browser Alerts</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     {notificationPermission === "granted"
-                      ? "Enabled - you'll be notified when it's your turn"
+                      ? "Enabled"
                       : notificationPermission === "denied"
-                        ? "Blocked - enable in browser settings"
-                        : "Get notified even when the tab is in background"}
+                        ? "Blocked in browser"
+                        : "Get notified in background"}
                   </p>
                 </div>
               </div>
@@ -160,17 +163,13 @@ export function SettingsModal({ isOpen, onClose, roomStyleId, onStyleChange, isH
                   Enable
                 </Button>
               )}
-              {notificationPermission === "granted" && (
-                <span className="text-sm text-primary font-medium">Enabled</span>
-              )}
-              {notificationPermission === "denied" && (
-                <span className="text-sm text-destructive font-medium">Blocked</span>
-              )}
+              {notificationPermission === "granted" && <span className="text-sm text-primary font-medium">On</span>}
+              {notificationPermission === "denied" && <span className="text-sm text-destructive font-medium">Off</span>}
             </div>
           </div>
         </div>
 
-        <div className="mt-6 pt-4 border-t border-border">
+        <div className="mt-5 sm:mt-6 pt-4 border-t border-border">
           <Button onClick={onClose} className="w-full">
             Done
           </Button>
