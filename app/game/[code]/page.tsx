@@ -15,9 +15,9 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
   const roomCode = code.toUpperCase()
 
   // Read player cookie on server
-  const playerCookie = await getPlayerCookie()
+  const playerCookie = await getPlayerCookie(roomCode)
 
-  if (playerCookie && playerCookie.roomCode === roomCode) {
+  if (playerCookie) {
     return <GameClient roomCode={roomCode} playerId={playerCookie.odId} playerName={playerCookie.name} />
   }
 

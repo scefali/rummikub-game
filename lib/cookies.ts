@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 
-const COOKIE_NAME = "rummikub_player"
+const COOKIE_PREFIX = "rummikub_player_"
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
 
 interface PlayerCookie {
@@ -13,13 +13,16 @@ interface PlayerCookie {
 
 export async function setPlayerCookie(playerId: string, playerName: string, roomCode: string) {
   const cookieStore = await cookies()
+  const upperRoomCode = roomCode.toUpperCase()
+  const cookieName = `${COOKIE_PREFIX}${upperRoomCode}`
+
   const value: PlayerCookie = {
     odId: playerId,
     name: playerName,
-    roomCode: roomCode.toUpperCase(),
+    roomCode: upperRoomCode,
   }
 
-  cookieStore.set(COOKIE_NAME, JSON.stringify(value), {
+  cookieStore.set(cookieName, JSON.stringify(value), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -28,9 +31,11 @@ export async function setPlayerCookie(playerId: string, playerName: string, room
   })
 }
 
-export async function getPlayerCookie(): Promise<PlayerCookie | null> {
+export async function getPlayerCookie(roomCode: string): Promise<PlayerCookie | null> {
   const cookieStore = await cookies()
-  const cookie = cookieStore.get(COOKIE_NAME)
+  const upperRoomCode = roomCode.toUpperCase()
+  const cookieName = `${COOKIE_PREFIX}${upperRoomCode}`
+  const cookie = cookieStore.get(cookieName)
 
   if (!cookie?.value) return null
 
@@ -41,7 +46,9 @@ export async function getPlayerCookie(): Promise<PlayerCookie | null> {
   }
 }
 
-export async function clearPlayerCookie() {
+export async function clearPlayerCookie(roomCode: string) {
   const cookieStore = await cookies()
-  cookieStore.delete(COOKIE_NAME)
+  const upperRoomCode = roomCode.toUpperCase()
+  const cookieName = `${COOKIE_PREFIX}${upperRoomCode}`
+  cookieStore.delete(cookieName)
 }
