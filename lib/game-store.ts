@@ -185,7 +185,13 @@ export async function getGameState(
 export async function startGame(
   roomCode: string,
   playerId: string,
-): Promise<{ success: boolean; gameState?: GameState; error?: string }> {
+): Promise<{ 
+  success: boolean
+  gameState?: GameState
+  error?: string
+  playersForEmail?: { email: string; name: string; playerCode: string }[]
+  roomStyleId?: RoomStyleId
+}> {
   const room = await getRoom(roomCode)
   if (!room) return { success: false, error: "Room not found" }
 
@@ -198,6 +204,15 @@ export async function startGame(
     return { success: false, error: `Need at least ${MIN_PLAYERS} players to start` }
   }
 
+  // Collect players with emails before initializing (for sending game link emails)
+  const playersForEmail = room.gameState.players
+    .filter((p) => p.email && p.playerCode)
+    .map((p) => ({
+      email: p.email!,
+      name: p.name,
+      playerCode: p.playerCode!,
+    }))
+
   const playerData = room.gameState.players.map((p) => ({
     id: p.id,
     name: p.name,
@@ -205,7 +220,7 @@ export async function startGame(
     playerCode: p.playerCode,
     email: p.email,
     hasInitialMeld: false,
-    lastSeenMeldTileIds: [], // Initialize lastSeenMeldTileIds as empty for all players
+    lastSeenMeldTileIds: [],
   }))
 
   const rules = getRulesForPlayerCount(playerData.length)
@@ -217,7 +232,12 @@ export async function startGame(
 
   await setRoom(room)
 
-  return { success: true, gameState: room.gameState }
+  return { 
+    success: true, 
+    gameState: room.gameState,
+    playersForEmail,
+    roomStyleId: room.roomStyleId,
+  }
 }
 
 export async function playTiles(
@@ -484,6 +504,51 @@ export async function changeRoomStyle(
   }
 
   room.roomStyleId = styleId
+  await setRoom(room)
+
+  return { success: true }
+}
+
+export async function bootPlayer(
+  roomCode: string,
+  requestingPlayerId: string,
+  targetPlayerId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const room = await getRoom(roomCode)
+  if (!room) return { success: false, error: "Room not found" }
+
+  // Can only boot in lobby
+  if (room.gameState.phase !== "lobby") {
+    return { success: false, error: "Can only boot players in lobby" }
+  }
+
+  // Make sure requesting player is in the room
+  const requestingPlayer = room.gameState.players.find((p) => p.id === requestingPlayerId)
+  if (!requestingPlayer) {
+    return { success: false, error: "You are not in this room" }
+  }
+
+  // Find target player
+  const targetIndex = room.gameState.players.findIndex((p) => p.id === targetPlayerId)
+  if (targetIndex === -1) {
+    return { success: false, error: "Player not found" }
+  }
+
+  const targetPlayer = room.gameState.players[targetIndex]
+  
+  // Can't boot yourself
+  if (targetPlayerId === requestingPlayerId) {
+    return { success: false, error: "Cannot boot yourself" }
+  }
+
+  // Remove the player
+  room.gameState.players.splice(targetIndex, 1)
+
+  // If we booted the host, assign a new host
+  if (targetPlayer.isHost && room.gameState.players.length > 0) {
+    room.gameState.players[0].isHost = true
+  }
+
   await setRoom(room)
 
   return { success: true }

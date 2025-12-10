@@ -1,12 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
 import * as gameStore from "@/lib/game-store"
-import { sendTurnNotificationEmail } from "@/lib/email"
+import { sendTurnNotificationEmail, sendGameLinkEmail } from "@/lib/email"
 import type { RoomStyleId } from "@/lib/game-types"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, roomCode, playerId, playerName, playerEmail, playerCode, melds, hand, workingArea, styleId } = body
+    const {
+      action,
+      roomCode,
+      playerId,
+      playerName,
+      playerEmail,
+      playerCode,
+      melds,
+      hand,
+      workingArea,
+      styleId,
+      targetPlayerId,
+    } = body
 
     console.log("[v0] API Request:", { action, roomCode, playerName, playerId: playerId?.slice(0, 8) })
 
@@ -66,6 +78,31 @@ export async function POST(request: NextRequest) {
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
+
+        if (result.playersForEmail && result.playersForEmail.length > 0) {
+          const allPlayerNames = result.playersForEmail.map((p) => p.name)
+          const gameStartedAt = new Date().toLocaleString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })
+
+          for (const player of result.playersForEmail) {
+            sendGameLinkEmail(
+              player.email,
+              player.name,
+              roomCode,
+              player.playerCode,
+              result.roomStyleId,
+              allPlayerNames,
+              gameStartedAt,
+            ).catch((err) => console.error("[v0] Game link email send failed:", err))
+          }
+        }
+
         return NextResponse.json({ success: true })
       }
 
@@ -136,6 +173,14 @@ export async function POST(request: NextRequest) {
 
       case "change_room_style": {
         const result = await gameStore.changeRoomStyle(roomCode, playerId, styleId as RoomStyleId)
+        if (!result.success) {
+          return NextResponse.json({ error: result.error }, { status: 400 })
+        }
+        return NextResponse.json({ success: true })
+      }
+
+      case "boot_player": {
+        const result = await gameStore.bootPlayer(roomCode, playerId, targetPlayerId)
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }

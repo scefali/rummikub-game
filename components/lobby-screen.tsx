@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Share2, Crown, Users, Loader2, Check, Info } from "lucide-react"
+import { Share2, Crown, Users, Loader2, Check, Info, X } from 'lucide-react'
 import { useState } from "react"
 import type { GameState, RoomStyleId } from "@/lib/game-types"
 import { MIN_PLAYERS, MAX_PLAYERS, LARGE_GAME_THRESHOLD, getRulesForPlayerCount, ROOM_STYLES } from "@/lib/game-types"
@@ -21,6 +21,7 @@ interface LobbyScreenProps {
   onStartGame: () => void
   onLeave: () => void
   onChangeRoomStyle: (styleId: RoomStyleId) => void
+  onBootPlayer: (targetPlayerId: string) => void
 }
 
 export function LobbyScreen({
@@ -32,9 +33,20 @@ export function LobbyScreen({
   onStartGame,
   onLeave,
   onChangeRoomStyle,
+  onBootPlayer,
 }: LobbyScreenProps) {
   const [linkCopied, setLinkCopied] = useState(false)
+  const [bootingPlayerId, setBootingPlayerId] = useState<string | null>(null)
   const isMobile = useIsMobile()
+
+  const handleBootPlayer = async (targetId: string) => {
+    setBootingPlayerId(targetId)
+    try {
+      await onBootPlayer(targetId)
+    } finally {
+      setBootingPlayerId(null)
+    }
+  }
 
   const currentPlayer = gameState.players.find((p) => p.id === playerId)
   const myPlayerCode = currentPlayer?.playerCode
@@ -48,7 +60,6 @@ export function LobbyScreen({
   const shareGameLink = async () => {
     const gameUrl = `${window.location.origin}/game/${roomCode}`
 
-    // Try native share API first (works great on mobile)
     if (navigator.share) {
       try {
         await navigator.share({
@@ -62,7 +73,6 @@ export function LobbyScreen({
       }
     }
 
-    // Fall back to clipboard
     try {
       await navigator.clipboard.writeText(gameUrl)
       setLinkCopied(true)
@@ -96,14 +106,12 @@ export function LobbyScreen({
             <span className="text-5xl font-mono font-bold tracking-[0.3em] text-primary">{roomCode}</span>
           </div>
 
-          {/* Room Style Selector - only for host on desktop */}
           {isHost && !isMobile && (
             <div className="mb-4">
               <RoomStyleSelector currentStyleId={roomStyleId} onStyleChange={onChangeRoomStyle} />
             </div>
           )}
 
-          {/* Share Game Link Button - now primary and more prominent */}
           <Button onClick={shareGameLink} className="gap-2 w-full mb-4">
             {linkCopied ? (
               <>
@@ -127,6 +135,7 @@ export function LobbyScreen({
         </CardContent>
       </Card>
 
+      {/* Rules Card */}
       <Card
         className={`w-full max-w-md mb-6 ${isLargeGame ? "bg-amber-500/10 border-amber-500/30" : "bg-card/80 border-border/50"}`}
       >
@@ -200,12 +209,29 @@ export function LobbyScreen({
                     </span>
                   </div>
                 </div>
-                {player.isHost && (
-                  <Badge variant="default" className="gap-1">
-                    <Crown className="w-3 h-3" />
-                    Host
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {player.isHost && (
+                    <Badge variant="default" className="gap-1">
+                      <Crown className="w-3 h-3" />
+                      Host
+                    </Badge>
+                  )}
+                  {player.id !== playerId && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleBootPlayer(player.id)}
+                      disabled={bootingPlayerId === player.id}
+                    >
+                      {bootingPlayerId === player.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
 

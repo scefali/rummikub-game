@@ -191,6 +191,18 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     [roomCode, playerId, apiCall, setErrorWithTimestamp],
   )
 
+  const bootPlayer = useCallback(
+    async (targetPlayerId: string) => {
+      try {
+        await apiCall({ action: "boot_player", roomCode, playerId, targetPlayerId })
+        pollGameState()
+      } catch (err) {
+        setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to boot player")
+      }
+    },
+    [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp],
+  )
+
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -233,6 +245,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         onStartGame={startGame}
         onLeave={disconnect}
         onChangeRoomStyle={changeRoomStyle}
+        onBootPlayer={bootPlayer}
       />
     )
   }
