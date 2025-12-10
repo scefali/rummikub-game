@@ -47,25 +47,42 @@ export function GameLinkEmail({
   gameStartedAt,
 }: GameLinkEmailProps) {
   const colors = EMAIL_STYLES[roomStyleId] || EMAIL_STYLES.classic
+  const firstName = playerName.split(" ")[0]
+  const allFirstNames = allPlayerNames.map((name) => name.split(" ")[0])
+
+  const formatPacificTime = (isoString: string) => {
+    const date = new Date(isoString)
+    return (
+      date.toLocaleString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "America/Los_Angeles",
+      }) + " PT"
+    )
+  }
 
   return (
     <Html>
       <Head />
       <Preview>
-        Your Rummikub game link for room {roomCode} - {allPlayerNames.join(", ")}
+        Your Rummikub game link for room {roomCode} - {allFirstNames.join(", ")}
       </Preview>
       <Body style={{ ...main, backgroundColor: colors.background }}>
         <Container style={container}>
           <Heading style={{ ...h1, color: colors.accent }}>Game Started!</Heading>
           <Text style={text}>
-            Hey {playerName}, your Rummikub game in room <strong>{roomCode}</strong> has started!
+            Hey {firstName}, your Rummikub game in room <strong>{roomCode}</strong> has started!
           </Text>
 
           <Section style={{ ...infoBox, backgroundColor: colors.secondary }}>
             <Text style={infoLabel}>Players</Text>
-            <Text style={infoValue}>{allPlayerNames.join(", ")}</Text>
+            <Text style={infoValue}>{allFirstNames.join(", ")}</Text>
             <Text style={infoLabel}>Started</Text>
-            <Text style={infoValue}>{gameStartedAt}</Text>
+            <Text style={infoValue}>{formatPacificTime(gameStartedAt)}</Text>
           </Section>
 
           <Hr style={divider} />
