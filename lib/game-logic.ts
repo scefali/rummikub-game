@@ -240,34 +240,62 @@ export function isValidRun(tiles: Tile[]): boolean {
     if (tile.color !== targetColor) return false
   }
 
-  // Sort by number to check consecutive
-  const sorted = [...tiles].sort((a, b) => {
-    if (a.isJoker && b.isJoker) return 0
-    if (a.isJoker) return 1
-    if (b.isJoker) return -1
-    return a.number - b.number
-  })
+  // Create a working array with actual numbers (using assignedNumber for jokers)
+  const tilesWithNumbers = tiles.map((tile) => ({
+    tile,
+    number: tile.isJoker ? (tile.assignedNumber ?? -1) : tile.number,
+    color: tile.isJoker ? (tile.assignedColor ?? tile.color) : tile.color,
+  }))
 
-  // Determine the sequence with jokers filling gaps
-  let jokerCount = tiles.filter((t) => t.isJoker).length
-  const numbers = nonJokers.map((t) => t.number).sort((a, b) => a - b)
+  // Check if any joker doesn't have an assigned number - need to validate differently
+  const unassignedJokers = tilesWithNumbers.filter((t) => t.number === -1)
 
-  if (numbers.length === 0) return jokerCount >= 3
+  if (unassignedJokers.length > 0) {
+    // Original validation logic for unassigned jokers
+    let jokerCount = tiles.filter((t) => !t.isJoker || !t.assignedNumber).length
+    const numbers = nonJokers.map((t) => t.number).sort((a, b) => a - b)
 
-  let current = numbers[0]
-  let numIndex = 0
+    if (numbers.length === 0) return jokerCount >= 3
 
-  for (let i = 0; i < tiles.length; i++) {
-    if (current > 13) return false
+    let current = numbers[0]
+    let numIndex = 0
 
-    if (numIndex < numbers.length && numbers[numIndex] === current) {
-      numIndex++
-    } else if (jokerCount > 0) {
-      jokerCount--
-    } else {
+    for (let i = 0; i < tiles.length; i++) {
+      if (current > 13) return false
+
+      if (numIndex < numbers.length && numbers[numIndex] === current) {
+        numIndex++
+      } else if (jokerCount > 0) {
+        jokerCount--
+      } else {
+        return false
+      }
+      current++
+    }
+
+    return true
+  }
+
+  // All jokers have assigned numbers - validate the complete sequence
+  // Sort by number
+  const sorted = [...tilesWithNumbers].sort((a, b) => a.number - b.number)
+
+  // Check if jokers match the target color
+  for (const item of sorted) {
+    if (item.tile.isJoker && item.color !== targetColor) {
       return false
     }
-    current++
+  }
+
+  // Check consecutive numbers
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].number !== sorted[i - 1].number + 1) {
+      return false
+    }
+    // Also check we don't exceed 13
+    if (sorted[i].number > 13) {
+      return false
+    }
   }
 
   return true
