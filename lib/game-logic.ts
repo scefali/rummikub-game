@@ -438,3 +438,7 @@ export function findValidSplitPoint(meld: Meld): number | null {
 
   return null
 }
+
+export function calculateHandPoints(hand: Tile[]): number {
+  return hand.reduce((sum, tile) => sum + (tile.isJoker ? 30 : tile.number), 0)
+}

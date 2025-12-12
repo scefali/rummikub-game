@@ -33,6 +33,7 @@ import {
   calculateProcessedMeldPoints,
   processMeld,
   findValidSplitPoint,
+  calculateHandPoints, // Import calculateHandPoints
 } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -413,9 +414,7 @@ export function PlayerController({
                   {player.name}
                   {player.id === playerId && " (you)"}
                 </span>
-                <span className="opacity-70">
-                  {(player as unknown as { handCount?: number }).handCount ?? player.hand.length}
-                </span>
+                <span className="opacity-70">{calculateHandPoints(player.hand)} pts</span>
               </div>
             ))}
           </div>

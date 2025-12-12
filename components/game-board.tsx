@@ -24,7 +24,7 @@ import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
-import { generateId, isValidMeld, findValidSplitPoint, processMeld } from "@/lib/game-logic"
+import { generateId, isValidMeld, processMeld, findValidSplitPoint, calculateHandPoints } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface GameBoardProps {
@@ -450,7 +450,10 @@ export function GameBoard({
                   {index === gameState.currentPlayerIndex && <ArrowRight className="w-4 h-4 text-primary" />}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>{(player as unknown as { handCount?: number }).handCount ?? player.hand.length} tiles</span>
+                  <span>{calculateHandPoints(player.hand)} pts</span>
+                  <span className="opacity-60">
+                    ({(player as unknown as { handCount?: number }).handCount ?? player.hand.length} tiles)
+                  </span>
                   {player.hasInitialMeld && (
                     <Badge variant="secondary" className="text-xs">
                       Started
