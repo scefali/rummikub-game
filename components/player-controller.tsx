@@ -10,7 +10,6 @@ import {
   Plus,
   X,
   Download,
-  Send,
   AlertCircle,
   Wrench,
   RotateCcw,
@@ -18,6 +17,7 @@ import {
   ChevronUp,
   Settings,
   Clock,
+  CheckCircle,
 } from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
@@ -357,13 +357,35 @@ export function PlayerController({
   }, [])
 
   const handleDrawTile = useCallback(async () => {
+    if (queueMode && queuedGameState) {
+      // In queue mode, simulate drawing a tile locally without calling API
+      console.log("[v0] Queue mode: Simulating draw tile (no API call)")
+      const simulatedTile: Tile = {
+        id: `queued-draw-${Date.now()}-${Math.random()}`,
+        number: 0, // Placeholder
+        color: "black",
+        isJoker: false,
+      }
+
+      onUpdateQueuedState({
+        ...queuedGameState,
+        hand: [...queuedGameState.hand, simulatedTile],
+      })
+
+      setDrawnTile(simulatedTile)
+      setSelectedTiles(new Set())
+      setSelectedWorkingTiles(new Set())
+      return
+    }
+
+    // Normal mode: actually draw from API
     const tile = await onDrawTile()
     if (tile) {
       setDrawnTile(tile)
     }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [onDrawTile])
+  }, [queueMode, queuedGameState, onUpdateQueuedState, onDrawTile])
 
   const handleResetTurn = useCallback(() => {
     if (queueMode && onUpdateQueuedState) {
@@ -483,6 +505,9 @@ export function PlayerController({
     },
     [queueMode, queuedGameState, onUpdateQueuedState, myHand, workingArea, melds, onPlayTiles],
   )
+
+  const canEnd =
+    isMyTurn && myPlayer.hasInitialMeld && canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!).canEnd
 
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
@@ -770,11 +795,13 @@ export function PlayerController({
               Draw & Pass
             </Button>
             <Button
+              variant={canEnd ? "default" : "secondary"}
+              disabled={!canEnd}
               className="flex-1 h-12 gap-2 text-base cursor-pointer active:scale-95 transition-transform"
               onClick={handleEndTurn}
             >
-              <Send className="w-5 h-5" />
-              {queueMode ? "Save Queue" : "End Turn"}
+              <CheckCircle className="w-5 h-5" />
+              {queueMode ? "Queue Move" : "End Turn"}
             </Button>
           </div>
         </div>

@@ -4,19 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import {
-  Clock,
-  ArrowRight,
-  AlertCircle,
-  Plus,
-  X,
-  Wrench,
-  ArrowLeft,
-  RotateCcw,
-  LogOut,
-  Settings,
-  Send,
-} from "lucide-react"
+import { Clock, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, LogOut, Settings } from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
@@ -322,13 +310,35 @@ export function GameBoard({
   }, [])
 
   const handleDrawTile = useCallback(async () => {
+    if (queueMode && queuedGameState && onUpdateQueuedState) {
+      // In queue mode, simulate drawing a tile locally without calling API
+      console.log("[v0] Queue mode: Simulating draw tile (no API call)")
+      const simulatedTile: Tile = {
+        id: `queued-draw-${Date.now()}-${Math.random()}`,
+        number: 0, // Placeholder
+        color: "black",
+        isJoker: false,
+      }
+
+      onUpdateQueuedState({
+        ...queuedGameState,
+        hand: [...queuedGameState.hand, simulatedTile],
+      })
+
+      setDrawnTile(simulatedTile)
+      setSelectedTiles(new Set())
+      setSelectedWorkingTiles(new Set())
+      return
+    }
+
+    // Normal mode: actually draw from API
     const tile = await onDrawTile()
     if (tile) {
       setDrawnTile(tile)
     }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [onDrawTile])
+  }, [queueMode, queuedGameState, onUpdateQueuedState, onDrawTile])
 
   const handleResetTurn = useCallback(() => {
     if (queueMode && onUpdateQueuedState && gameState) {
@@ -386,6 +396,31 @@ export function GameBoard({
   const canEnd = totalSelected === 0 || wouldBeValidMeld
 
   const handleDraw = useCallback(async () => {
+    if (queueMode && queuedGameState && onUpdateQueuedState) {
+      // In queue mode, simulate drawing and immediately end turn locally
+      console.log("[v0] Queue mode: Simulating draw & pass (no API call)")
+      const simulatedTile: Tile = {
+        id: `queued-draw-${Date.now()}-${Math.random()}`,
+        number: 0, // Placeholder
+        color: "black",
+        isJoker: false,
+      }
+
+      onUpdateQueuedState({
+        ...queuedGameState,
+        hand: [...queuedGameState.hand, simulatedTile],
+      })
+
+      setDrawnTile(simulatedTile)
+      setSelectedTiles(new Set())
+      setSelectedWorkingTiles(new Set())
+
+      // In queue mode, immediately queue the turn after drawing
+      await onQueueTurn(queuedGameState.melds, [...queuedGameState.hand, simulatedTile], queuedGameState.workingArea)
+      return
+    }
+
+    // Normal mode: actually draw from API and end turn
     const tile = await onDrawTile()
     if (tile) {
       setDrawnTile(tile)
@@ -393,7 +428,7 @@ export function GameBoard({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
-  }, [onDrawTile, onEndTurn])
+  }, [queueMode, queuedGameState, onUpdateQueuedState, onQueueTurn, onDrawTile, onEndTurn])
 
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
@@ -683,9 +718,12 @@ export function GameBoard({
                   >
                     Draw Tile
                   </Button>
-                  <Button onClick={handleEndTurn} disabled={!canEnd} size="sm" className="bg-primary">
-                    <Send className="w-4 h-4 mr-1" />
-                    {queueMode ? "Save Queue" : "End Turn"}
+                  <Button
+                    disabled={!canEnd}
+                    onClick={handleEndTurn}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                  >
+                    {queueMode ? "Queue Move" : "End Turn"}
                   </Button>
                   {isMyTurn && totalSelected === 0 && canEnd && (
                     <Button onClick={handleDraw} variant="outline" size="sm">
