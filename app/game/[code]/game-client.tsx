@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { clearPlayerCookie } from "@/lib/cookies"
 import { showTurnNotification } from "@/lib/notifications"
 import { playTurnSound } from "@/lib/settings"
+import { useQueueMode } from "@/lib/queue-mode-context"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { Loader2 } from "lucide-react"
 
@@ -22,12 +23,12 @@ interface GameClientProps {
 export function GameClient({ roomCode, playerId, playerName }: GameClientProps) {
   const router = useRouter()
   const isMobile = useIsMobile()
+  const { queueMode, setQueueMode } = useQueueMode()
 
   const [gameState, setGameState] = useState<GameState | null>(null)
   const [roomStyleId, setRoomStyleId] = useState<RoomStyleId>("classic")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [queueMode, setQueueMode] = useState(false)
   const [queuedGameState, setQueuedGameState] = useState<{
     melds: Meld[]
     hand: Tile[]
@@ -280,7 +281,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
 
       setQueueMode(enabled)
     },
-    [gameState, playerId, roomCode],
+    [gameState, playerId, roomCode, setQueueMode],
   )
 
   const disconnect = useCallback(async () => {
@@ -359,7 +360,6 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         onEndGame={endGame}
         onQueueTurn={queueTurn}
         onClearQueuedTurn={clearQueuedTurn}
-        queueMode={queueMode}
         onToggleQueueMode={handleToggleQueueMode}
         queuedGameState={queuedGameState}
         onUpdateQueuedState={setQueuedGameState}
@@ -383,7 +383,6 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       onChangeRoomStyle={changeRoomStyle}
       onQueueTurn={queueTurn}
       onClearQueuedTurn={clearQueuedTurn}
-      queueMode={queueMode}
       onToggleQueueMode={handleToggleQueueMode}
       queuedGameState={queuedGameState}
       onUpdateQueuedState={setQueuedGameState}

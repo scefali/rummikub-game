@@ -13,6 +13,7 @@ import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
 import { QueuedMoveViewer } from "@/components/queued-move-viewer"
+import { useQueueMode } from "@/lib/queue-mode-context"
 import {
   generateId,
   isValidMeld,
@@ -37,9 +38,7 @@ interface GameBoardProps {
   onChangeRoomStyle: (styleId: RoomStyleId) => void
   onQueueTurn: (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => Promise<void>
   onClearQueuedTurn: () => Promise<void>
-  queueMode: boolean
   onToggleQueueMode: (enabled: boolean) => void
-  queuedGameState: { melds: Meld[]; hand: Tile[]; workingArea: Tile[] } | null
   onUpdateQueuedState: (state: { melds: Meld[]; hand: Tile[]; workingArea: Tile[] } | null) => void
   error: string | null
 }
@@ -58,12 +57,12 @@ export function GameBoard({
   onChangeRoomStyle,
   onQueueTurn,
   onClearQueuedTurn,
-  queueMode,
   onToggleQueueMode,
-  queuedGameState,
   onUpdateQueuedState,
   error,
 }: GameBoardProps) {
+  const { queueMode } = useQueueMode()
+
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
@@ -75,9 +74,10 @@ export function GameBoard({
   const currentPlayer = gameState.players[currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)!
   const isMyTurn = currentPlayer?.id === playerId || queueMode
-  const myHand = queueMode && queuedGameState ? queuedGameState.hand : myPlayer.hand || []
-  const workingArea = queueMode && queuedGameState ? queuedGameState.workingArea : gameState.workingArea || []
-  const melds = queueMode && queuedGameState ? queuedGameState.melds : gameState.melds
+  const myHand = queueMode && gameState.queuedGameState ? gameState.queuedGameState.hand : myPlayer.hand || []
+  const workingArea =
+    queueMode && gameState.queuedGameState ? gameState.queuedGameState.workingArea : gameState.workingArea || []
+  const melds = queueMode && gameState.queuedGameState ? gameState.queuedGameState.melds : gameState.melds
   const canUseTableTiles = myPlayer.hasInitialMeld
   const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
 
@@ -310,7 +310,7 @@ export function GameBoard({
   }, [])
 
   const handleDrawTile = useCallback(async () => {
-    if (queueMode && queuedGameState && onUpdateQueuedState) {
+    if (queueMode && gameState.queuedGameState && onUpdateQueuedState) {
       // In queue mode, simulate drawing a tile locally without calling API
       console.log("[v0] Queue mode: Simulating draw tile (no API call)")
       const simulatedTile: Tile = {
@@ -321,8 +321,8 @@ export function GameBoard({
       }
 
       onUpdateQueuedState({
-        ...queuedGameState,
-        hand: [...queuedGameState.hand, simulatedTile],
+        ...gameState.queuedGameState,
+        hand: [...gameState.queuedGameState.hand, simulatedTile],
       })
 
       setDrawnTile(simulatedTile)
@@ -338,7 +338,7 @@ export function GameBoard({
     }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [queueMode, queuedGameState, onUpdateQueuedState, onDrawTile])
+  }, [queueMode, gameState.queuedGameState, onUpdateQueuedState, onDrawTile])
 
   const handleResetTurn = useCallback(() => {
     if (queueMode && onUpdateQueuedState && gameState) {
@@ -377,9 +377,13 @@ export function GameBoard({
   })
 
   const handleEndTurn = useCallback(async () => {
-    if (queueMode && queuedGameState) {
+    if (queueMode && gameState.queuedGameState) {
       console.log("[v0] Saving queued turn from game board")
-      await onQueueTurn(queuedGameState.melds, queuedGameState.hand, queuedGameState.workingArea)
+      await onQueueTurn(
+        gameState.queuedGameState.melds,
+        gameState.queuedGameState.hand,
+        gameState.queuedGameState.workingArea,
+      )
       return
     }
 
@@ -391,10 +395,20 @@ export function GameBoard({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
-  }, [queueMode, queuedGameState, onQueueTurn, myPlayer, melds, myHand, workingArea, gameState.rules, onEndTurn])
+  }, [
+    queueMode,
+    gameState.queuedGameState,
+    onQueueTurn,
+    myPlayer,
+    melds,
+    myHand,
+    workingArea,
+    gameState.rules,
+    onEndTurn,
+  ])
 
   const handleDraw = useCallback(async () => {
-    if (queueMode && queuedGameState && onUpdateQueuedState) {
+    if (queueMode && gameState.queuedGameState && onUpdateQueuedState) {
       // Queue mode: Just simulate the draw action locally, don't submit queue yet
       console.log("[v0] Queue mode: Simulating draw tile locally")
       const simulatedTile: Tile = {
@@ -405,8 +419,8 @@ export function GameBoard({
       }
 
       onUpdateQueuedState({
-        ...queuedGameState,
-        hand: [...queuedGameState.hand, simulatedTile],
+        ...gameState.queuedGameState,
+        hand: [...gameState.queuedGameState.hand, simulatedTile],
       })
 
       setDrawnTile(simulatedTile)
@@ -425,7 +439,7 @@ export function GameBoard({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
-  }, [queueMode, queuedGameState, onUpdateQueuedState, onDrawTile, onEndTurn])
+  }, [queueMode, gameState.queuedGameState, onUpdateQueuedState, onDrawTile, onEndTurn])
 
   const canEnd = totalSelected === 0 || wouldBeValidMeld
 
@@ -726,6 +740,33 @@ export function GameBoard({
 
             {sortedTiles.length === 0 && <p className="text-muted-foreground text-sm py-4">No tiles in hand</p>}
           </div>
+
+          {totalSelected > 0 && (isMyTurn || queueMode) && (
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border/50">
+              <span className="text-sm text-muted-foreground">{totalSelected} tiles selected</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={wouldBeValidMeld ? "default" : "secondary"}
+                  onClick={createMeld}
+                  disabled={allSelectedTiles.length < 3}
+                  className="gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  {wouldBeValidMeld ? "Create Meld" : `Need ${3 - allSelectedTiles.length} more`}
+                </Button>
+                {selectedWorkingTiles.size > 0 && (
+                  <Button variant="outline" size="sm" onClick={returnSelectedToHand} className="gap-1 bg-transparent">
+                    <ArrowLeft className="w-4 h-4" />
+                    Return to Hand
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={clearSelection}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

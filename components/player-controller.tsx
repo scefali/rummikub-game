@@ -27,6 +27,7 @@ import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
 import { QueuedMoveViewer } from "@/components/queued-move-viewer"
+import { useQueueMode } from "@/lib/queue-mode-context"
 import {
   generateId,
   isValidMeld,
@@ -50,7 +51,6 @@ interface PlayerControllerProps {
   onEndGame: () => void
   onQueueTurn: (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => Promise<void>
   onClearQueuedTurn: () => Promise<void>
-  queueMode: boolean
   onToggleQueueMode: (enabled: boolean) => void
   queuedGameState: { melds: Meld[]; hand: Tile[]; workingArea: Tile[] } | null
   onUpdateQueuedState: (state: { melds: Meld[]; hand: Tile[]; workingArea: Tile[] } | null) => void
@@ -69,12 +69,13 @@ export function PlayerController({
   onEndGame,
   onQueueTurn,
   onClearQueuedTurn,
-  queueMode,
   onToggleQueueMode,
   queuedGameState,
   onUpdateQueuedState,
   error,
 }: PlayerControllerProps) {
+  const { queueMode } = useQueueMode()
+
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
   const [showPlayers, setShowPlayers] = useState(false)
