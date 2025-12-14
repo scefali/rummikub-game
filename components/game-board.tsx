@@ -393,8 +393,6 @@ export function GameBoard({
     await onEndTurn()
   }, [queueMode, queuedGameState, onQueueTurn, myPlayer, melds, myHand, workingArea, gameState.rules, onEndTurn])
 
-  const canEnd = totalSelected === 0 || wouldBeValidMeld
-
   const handleDraw = useCallback(async () => {
     if (queueMode && queuedGameState && onUpdateQueuedState) {
       // Queue mode: Just simulate the draw action locally, don't submit queue yet
@@ -428,6 +426,8 @@ export function GameBoard({
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
   }, [queueMode, queuedGameState, onUpdateQueuedState, onDrawTile, onEndTurn])
+
+  const canEnd = totalSelected === 0 || wouldBeValidMeld
 
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
@@ -679,24 +679,7 @@ export function GameBoard({
               )}
             </div>
             <div className="flex gap-2">
-              {isMyTurn && totalSelected > 0 && (
-                <>
-                  <Button
-                    variant={wouldBeValidMeld ? "default" : "secondary"}
-                    size="sm"
-                    onClick={createMeld}
-                    disabled={allSelectedTiles.length < 3}
-                    className="gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    {wouldBeValidMeld ? "Create Meld" : `Select ${3 - allSelectedTiles.length} more`}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={clearSelection}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
-              {isMyTurn && totalSelected === 0 && (
+              {(isMyTurn || queueMode) && (
                 <>
                   {hasChangesToReset && (
                     <Button
@@ -709,16 +692,15 @@ export function GameBoard({
                       Reset Move
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDrawTile}
-                    className="cursor-pointer bg-transparent"
-                  >
-                    Draw Tile
-                  </Button>
                   <Button onClick={handleEndTurn} size="lg" disabled={!canEnd}>
-                    {queueMode ? "Queue Move" : "End Turn"}
+                    {queueMode ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-1" />
+                        Queue Move
+                      </>
+                    ) : (
+                      "End Turn"
+                    )}
                   </Button>
                   {isMyTurn && totalSelected === 0 && canEnd && (
                     <Button onClick={handleDraw} variant="outline" size="sm">

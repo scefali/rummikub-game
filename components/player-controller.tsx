@@ -837,8 +837,17 @@ export function PlayerController({
               className="flex-1 h-12 gap-2 text-base cursor-pointer active:scale-95 transition-transform"
               disabled={!canEnd}
             >
-              <CheckCircle className="w-5 h-5" />
-              {queueMode ? "Queue Move" : "End Turn"}
+              {queueMode ? (
+                <>
+                  <Clock className="w-5 h-5" />
+                  Queue Move
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-5 h-5" />
+                  End Turn
+                </>
+              )}
             </Button>
           </div>
         </div>
