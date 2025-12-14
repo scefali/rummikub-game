@@ -2,7 +2,6 @@ import { getPlayerCookie } from "@/lib/cookies"
 import { redirect } from "next/navigation"
 import { GameClient } from "./game-client"
 import { GamePageClient } from "./game-page-client"
-import { QueueModeProvider } from "@/lib/queue-mode-context"
 import * as gameStore from "@/lib/game-store"
 
 interface GamePageProps {
@@ -19,11 +18,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
   const playerCookie = await getPlayerCookie(roomCode)
 
   if (playerCookie) {
-    return (
-      <QueueModeProvider>
-        <GameClient roomCode={roomCode} playerId={playerCookie.odId} playerName={playerCookie.name} />
-      </QueueModeProvider>
-    )
+    return <GameClient roomCode={roomCode} playerId={playerCookie.playerId} playerName={playerCookie.name} />
   }
 
   if (playerCode) {

@@ -36,10 +36,9 @@ interface GameBoardProps {
   onResetTurn: () => void
   onEndGame: () => void
   onChangeRoomStyle: (styleId: RoomStyleId) => void
-  onQueueTurn: (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => Promise<void>
+  onQueueTurn: () => Promise<void>
   onClearQueuedTurn: () => Promise<void>
   onToggleQueueMode: (enabled: boolean) => void
-  onUpdateQueuedState: (state: { melds: Meld[]; hand: Tile[]; workingArea: Tile[] } | null) => void
   error: string | null
 }
 
@@ -58,10 +57,9 @@ export function GameBoard({
   onQueueTurn,
   onClearQueuedTurn,
   onToggleQueueMode,
-  onUpdateQueuedState,
   error,
 }: GameBoardProps) {
-  const { queueMode } = useQueueMode()
+  const { queueMode, effectiveMelds, effectiveHand, effectiveWorkingArea, updatePendingChanges } = useQueueMode()
 
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
@@ -74,10 +72,9 @@ export function GameBoard({
   const currentPlayer = gameState.players[currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)!
   const isMyTurn = currentPlayer?.id === playerId || queueMode
-  const myHand = queueMode && gameState.queuedGameState ? gameState.queuedGameState.hand : myPlayer.hand || []
-  const workingArea =
-    queueMode && gameState.queuedGameState ? gameState.queuedGameState.workingArea : gameState.workingArea || []
-  const melds = queueMode && gameState.queuedGameState ? gameState.queuedGameState.melds : gameState.melds
+  const myHand = effectiveHand
+  const workingArea = effectiveWorkingArea
+  const melds = effectiveMelds
   const canUseTableTiles = myPlayer.hasInitialMeld
   const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
 
@@ -159,13 +156,13 @@ export function GameBoard({
 
     const newMelds = [...melds, newMeld]
     if (queueMode) {
-      onUpdateQueuedState({ melds: newMelds, hand: remainingHand, workingArea: remainingWorking })
+      updatePendingChanges({ melds: newMelds, hand: remainingHand, workingArea: remainingWorking })
     } else {
       onPlayTiles(newMelds, remainingHand, remainingWorking)
     }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles, queueMode, onUpdateQueuedState])
+  }, [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles, queueMode, updatePendingChanges])
 
   const addToMeld = useCallback(
     (meldId: string) => {
@@ -182,14 +179,14 @@ export function GameBoard({
       })
 
       if (queueMode) {
-        onUpdateQueuedState({ melds: updatedMelds, hand: remainingHand, workingArea: remainingWorking })
+        updatePendingChanges({ melds: updatedMelds, hand: remainingHand, workingArea: remainingWorking })
       } else {
         onPlayTiles(updatedMelds, remainingHand, remainingWorking)
       }
       setSelectedTiles(new Set())
       setSelectedWorkingTiles(new Set())
     },
-    [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles, queueMode, onUpdateQueuedState],
+    [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles, queueMode, updatePendingChanges],
   )
 
   const takeTileFromMeld = useCallback(
@@ -212,14 +209,14 @@ export function GameBoard({
         .filter((m) => m.tiles.length > 0)
 
       if (queueMode) {
-        onUpdateQueuedState({ melds: updatedMelds, hand: [...myHand, tile], workingArea })
+        updatePendingChanges({ melds: updatedMelds, hand: [...myHand, tile], workingArea })
       } else {
         onPlayTiles(updatedMelds, myHand, [...workingArea, tile])
       }
 
       setSelectedWorkingTiles((prev) => new Set([...prev, tileId]))
     },
-    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, onUpdateQueuedState],
+    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, updatePendingChanges],
   )
 
   const breakMeld = useCallback(
@@ -232,14 +229,14 @@ export function GameBoard({
       const updatedMelds = melds.filter((m) => m.id !== meldId)
 
       if (queueMode) {
-        onUpdateQueuedState({ melds: updatedMelds, hand: [...myHand, ...meld.tiles], workingArea })
+        updatePendingChanges({ melds: updatedMelds, hand: [...myHand, ...meld.tiles], workingArea })
       } else {
         onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
       }
 
       setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
     },
-    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, onUpdateQueuedState],
+    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, updatePendingChanges],
   )
 
   const splitMeld = useCallback(
@@ -262,12 +259,12 @@ export function GameBoard({
       updatedMelds.push({ id: generateId(), tiles: secondPart })
 
       if (queueMode) {
-        onUpdateQueuedState({ melds: updatedMelds, hand: myHand, workingArea })
+        updatePendingChanges({ melds: updatedMelds, hand: myHand, workingArea })
       } else {
         onPlayTiles(updatedMelds, myHand, workingArea)
       }
     },
-    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, onUpdateQueuedState],
+    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, updatePendingChanges],
   )
 
   const returnSelectedToHand = useCallback(() => {
@@ -288,7 +285,7 @@ export function GameBoard({
     })
 
     if (queueMode) {
-      onUpdateQueuedState({ melds, hand: [...myHand, ...tilesToReturn], workingArea: tilesToKeep })
+      updatePendingChanges({ melds, hand: [...myHand, ...tilesToReturn], workingArea: tilesToKeep })
     } else {
       onPlayTiles(melds, [...myHand, ...tilesToReturn], tilesToKeep)
     }
@@ -301,7 +298,7 @@ export function GameBoard({
     myHand,
     onPlayTiles,
     queueMode,
-    onUpdateQueuedState,
+    updatePendingChanges,
   ])
 
   const clearSelection = useCallback(() => {
@@ -310,7 +307,7 @@ export function GameBoard({
   }, [])
 
   const handleDrawTile = useCallback(async () => {
-    if (queueMode && gameState.queuedGameState && onUpdateQueuedState) {
+    if (queueMode && updatePendingChanges) {
       // In queue mode, simulate drawing a tile locally without calling API
       console.log("[v0] Queue mode: Simulating draw tile (no API call)")
       const simulatedTile: Tile = {
@@ -320,9 +317,8 @@ export function GameBoard({
         isJoker: false,
       }
 
-      onUpdateQueuedState({
-        ...gameState.queuedGameState,
-        hand: [...gameState.queuedGameState.hand, simulatedTile],
+      updatePendingChanges({
+        hand: [...myHand, simulatedTile],
       })
 
       setDrawnTile(simulatedTile)
@@ -338,13 +334,13 @@ export function GameBoard({
     }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [queueMode, gameState.queuedGameState, onUpdateQueuedState, onDrawTile])
+  }, [queueMode, updatePendingChanges, myHand, onDrawTile])
 
   const handleResetTurn = useCallback(() => {
-    if (queueMode && onUpdateQueuedState && gameState) {
+    if (queueMode && updatePendingChanges && gameState) {
       const myPlayer = gameState.players.find((p) => p.id === playerId)
       if (myPlayer) {
-        onUpdateQueuedState({
+        updatePendingChanges({
           melds: JSON.parse(JSON.stringify(gameState.melds)),
           hand: JSON.parse(JSON.stringify(myPlayer.hand)),
           workingArea: JSON.parse(JSON.stringify(gameState.workingArea)),
@@ -355,7 +351,7 @@ export function GameBoard({
     }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [queueMode, onUpdateQueuedState, gameState, playerId, onResetTurn])
+  }, [queueMode, updatePendingChanges, gameState, playerId, onResetTurn])
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
@@ -377,13 +373,9 @@ export function GameBoard({
   })
 
   const handleEndTurn = useCallback(async () => {
-    if (queueMode && gameState.queuedGameState) {
+    if (queueMode) {
       console.log("[v0] Saving queued turn from game board")
-      await onQueueTurn(
-        gameState.queuedGameState.melds,
-        gameState.queuedGameState.hand,
-        gameState.queuedGameState.workingArea,
-      )
+      await onQueueTurn()
       return
     }
 
@@ -395,20 +387,10 @@ export function GameBoard({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
-  }, [
-    queueMode,
-    gameState.queuedGameState,
-    onQueueTurn,
-    myPlayer,
-    melds,
-    myHand,
-    workingArea,
-    gameState.rules,
-    onEndTurn,
-  ])
+  }, [queueMode, onQueueTurn, myPlayer, melds, myHand, workingArea, gameState.rules, onEndTurn])
 
   const handleDraw = useCallback(async () => {
-    if (queueMode && gameState.queuedGameState && onUpdateQueuedState) {
+    if (queueMode && updatePendingChanges) {
       // Queue mode: Just simulate the draw action locally, don't submit queue yet
       console.log("[v0] Queue mode: Simulating draw tile locally")
       const simulatedTile: Tile = {
@@ -418,9 +400,8 @@ export function GameBoard({
         isJoker: false,
       }
 
-      onUpdateQueuedState({
-        ...gameState.queuedGameState,
-        hand: [...gameState.queuedGameState.hand, simulatedTile],
+      updatePendingChanges({
+        hand: [...myHand, simulatedTile],
       })
 
       setDrawnTile(simulatedTile)
@@ -439,7 +420,7 @@ export function GameBoard({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
-  }, [queueMode, gameState.queuedGameState, onUpdateQueuedState, onDrawTile, onEndTurn])
+  }, [queueMode, updatePendingChanges, myHand, onDrawTile, onEndTurn])
 
   const canEnd = totalSelected === 0 || wouldBeValidMeld
 
