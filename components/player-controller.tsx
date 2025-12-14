@@ -91,7 +91,7 @@ export function PlayerController({
   const myHand = effectiveHand
   const workingArea = effectiveWorkingArea
   const melds = effectiveMelds
-  const canUseTableTiles = myPlayer.hasInitialMeld
+  const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
 
   const sortedHand = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
@@ -184,7 +184,7 @@ export function PlayerController({
 
   const takeTileFromMeld = useCallback(
     (tileId: string, meldId: string) => {
-      if (!myPlayer.hasInitialMeld) return
+      if (!myPlayer?.hasInitialMeld) return
 
       const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
@@ -209,7 +209,7 @@ export function PlayerController({
 
       setSelectedWorkingTiles((prev) => new Set([...prev, tileId]))
     },
-    [myPlayer.hasInitialMeld, melds, myHand, workingArea, updatePendingChanges],
+    [myPlayer?.hasInitialMeld, melds, myHand, workingArea, updatePendingChanges],
   )
 
   const returnSelectedToHand = useCallback(() => {
@@ -238,7 +238,7 @@ export function PlayerController({
 
   const breakMeld = useCallback(
     (meldId: string) => {
-      if (!myPlayer.hasInitialMeld) return
+      if (!myPlayer?.hasInitialMeld) return
 
       const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
@@ -253,12 +253,12 @@ export function PlayerController({
 
       setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
     },
-    [myPlayer.hasInitialMeld, melds, myHand, workingArea, updatePendingChanges],
+    [myPlayer?.hasInitialMeld, melds, myHand, workingArea, updatePendingChanges],
   )
 
   const splitMeld = useCallback(
     (meldId: string) => {
-      if (!myPlayer.hasInitialMeld) return
+      if (!myPlayer?.hasInitialMeld) return
 
       const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
@@ -280,7 +280,7 @@ export function PlayerController({
         workingArea: workingArea,
       })
     },
-    [myPlayer.hasInitialMeld, melds, myHand, workingArea, updatePendingChanges],
+    [myPlayer?.hasInitialMeld, melds, myHand, workingArea, updatePendingChanges],
   )
 
   const clearSelection = useCallback(() => {
@@ -350,7 +350,7 @@ export function PlayerController({
     myHand.length !== gameState.turnStartHand.length ||
     !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
 
-  const lastSeenTileIds = new Set(myPlayer.lastSeenMeldTileIds || [])
+  const lastSeenTileIds = new Set(myPlayer?.lastSeenMeldTileIds || [])
 
   const newTileIds = new Set<string>()
   melds.forEach((meld) => {
@@ -469,7 +469,7 @@ export function PlayerController({
   }, [queueMode, myHand, updatePendingChanges, onDrawTile, onEndTurn])
 
   const canEnd =
-    isMyTurn && myPlayer.hasInitialMeld && canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!).canEnd
+    isMyTurn && myPlayer?.hasInitialMeld && canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!).canEnd
 
   if (!myPlayer) {
     return (
@@ -509,7 +509,7 @@ export function PlayerController({
               variant="outline"
               size="sm"
               onClick={() => {
-                if (myPlayer.queuedTurn) {
+                if (myPlayer?.queuedTurn) {
                   setShowQueuedMoveViewer(true)
                 } else {
                   onToggleQueueMode(true)
@@ -519,7 +519,7 @@ export function PlayerController({
             >
               <Clock className="w-3 h-3 mr-1" />
               Queue
-              {myPlayer.queuedTurn && (
+              {myPlayer?.queuedTurn && (
                 <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px] leading-tight">
                   ✓
                 </Badge>
@@ -527,7 +527,7 @@ export function PlayerController({
             </Button>
           )}
 
-          {myPlayer.queuedTurn && (
+          {myPlayer?.queuedTurn && (
             <Button variant="ghost" size="sm" onClick={onClearQueuedTurn} className="h-7 px-2">
               <X className="w-3 h-3" />
             </Button>
@@ -594,7 +594,7 @@ export function PlayerController({
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Table ({melds.length})
             </h3>
-            {!myPlayer.hasInitialMeld && isMyTurn && (
+            {!myPlayer?.hasInitialMeld && isMyTurn && (
               <Badge variant="outline" className="text-xs">
                 First turn: hand only
               </Badge>
@@ -611,12 +611,12 @@ export function PlayerController({
                 <MeldDisplay
                   key={meld.id}
                   meld={meld}
-                  isInteractive={isMyTurn && myPlayer.hasInitialMeld}
+                  isInteractive={isMyTurn && (myPlayer?.hasInitialMeld ?? false)}
                   hasSelectedTiles={totalSelected > 0}
-                  onTileClick={isMyTurn && myPlayer.hasInitialMeld ? takeTileFromMeld : undefined}
+                  onTileClick={isMyTurn && myPlayer?.hasInitialMeld ? takeTileFromMeld : undefined}
                   onAddTile={isMyTurn ? addToMeld : undefined}
-                  onDeleteMeld={isMyTurn && myPlayer.hasInitialMeld ? breakMeld : undefined}
-                  onSplitMeld={isMyTurn && myPlayer.hasInitialMeld ? splitMeld : undefined}
+                  onDeleteMeld={isMyTurn && myPlayer?.hasInitialMeld ? breakMeld : undefined}
+                  onSplitMeld={isMyTurn && myPlayer?.hasInitialMeld ? splitMeld : undefined}
                   compact
                   newTileIds={newTileIds}
                   hidePoints={allPlayersStarted}
@@ -709,7 +709,7 @@ export function PlayerController({
 
           {(handExpanded || queueMode) && (
             <>
-              {!myPlayer.hasInitialMeld && (
+              {!myPlayer?.hasInitialMeld && (
                 <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
                   <p className="text-xs text-foreground">
                     First move: melds totaling <strong>{initialMeldThreshold}+ pts</strong> from your hand only
@@ -770,7 +770,14 @@ export function PlayerController({
             <Button
               onClick={handleEndTurn}
               className="flex-1 h-12 gap-2 text-base cursor-pointer active:scale-95 transition-transform"
-              disabled={!canEnd}
+              disabled={
+                !isMyTurn ||
+                !(
+                  myPlayer &&
+                  myPlayer.hasInitialMeld &&
+                  canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!).canEnd
+                )
+              }
             >
               {queueMode ? (
                 <>
@@ -788,7 +795,7 @@ export function PlayerController({
         </div>
       )}
 
-      {myPlayer.queuedTurn && (
+      {myPlayer?.queuedTurn && (
         <QueuedMoveViewer
           open={showQueuedMoveViewer}
           onOpenChange={setShowQueuedMoveViewer}
