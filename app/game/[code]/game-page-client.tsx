@@ -36,6 +36,7 @@ export function GamePageClient({ roomCode, pendingLogin }: GamePageClientProps) 
 
       if (data.success && data.playerId && data.playerName) {
         await setPlayerCookie(data.playerId, data.playerName, roomCode)
+        router.replace(`/game/${roomCode}`)
         setConfirmedPlayer({ playerId: data.playerId, playerName: data.playerName })
       } else {
         // Login failed, redirect to home

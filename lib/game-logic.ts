@@ -442,3 +442,38 @@ export function findValidSplitPoint(meld: Meld): number | null {
 export function calculateHandPoints(hand: Tile[]): number {
   return hand.reduce((sum, tile) => sum + (tile.isJoker ? 30 : tile.number), 0)
 }
+
+export function computeBoardSignature(melds: Meld[]): string {
+  const allTileIds: string[] = []
+  for (const meld of melds) {
+    for (const tile of meld.tiles) {
+      allTileIds.push(tile.id)
+    }
+  }
+  return allTileIds.sort().join(",")
+}
+
+export function formatTile(tile: Tile): string {
+  if (tile.isJoker) {
+    if (tile.assignedNumber && tile.assignedColor) {
+      const colorCode = tile.assignedColor[0].toUpperCase()
+      return `Joker(${colorCode}${tile.assignedNumber})`
+    }
+    return "Joker"
+  }
+  const colorCode = tile.color[0].toUpperCase()
+  return `${colorCode}${tile.number}`
+}
+
+export function summarizeMeld(meld: Meld): string {
+  const processed = processMeld(meld)
+  if (isValidRun(processed.tiles)) {
+    const tiles = processed.tiles.map(formatTile).join(" ")
+    return `Run: ${tiles}`
+  } else if (isValidSet(processed.tiles)) {
+    const tiles = processed.tiles.map(formatTile).join(" ")
+    return `Set: ${tiles}`
+  }
+  const tiles = processed.tiles.map(formatTile).join(" ")
+  return `Invalid: ${tiles}`
+}

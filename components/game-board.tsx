@@ -4,19 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import {
-  Layers,
-  Users,
-  ArrowRight,
-  AlertCircle,
-  Plus,
-  X,
-  Wrench,
-  ArrowLeft,
-  RotateCcw,
-  LogOut,
-  Settings,
-} from "lucide-react"
+import { Clock, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, LogOut, Settings } from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
@@ -24,6 +12,7 @@ import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
+import { QueueMoveModal } from "@/components/queue-move-modal" // Import QueueMoveModal
 import { generateId, isValidMeld, processMeld, findValidSplitPoint, calculateHandPoints } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -33,13 +22,15 @@ interface GameBoardProps {
   roomCode: string
   roomStyleId: RoomStyleId
   isHost: boolean
-  onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
+  onPlayTiles: (melds: Meld[], hand: Tile[], workingArea?: Tile[]) => void
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
   onEndGame: () => void
   onChangeRoomStyle: (styleId: RoomStyleId) => void
-  error?: string | null
+  onQueueTurn: (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => Promise<void> // Add queue turn prop
+  onClearQueuedTurn: () => Promise<void> // Add clear queued turn prop
+  error: string | null
 }
 
 export function GameBoard({
@@ -54,6 +45,8 @@ export function GameBoard({
   onResetTurn,
   onEndGame,
   onChangeRoomStyle,
+  onQueueTurn, // Destructure queue turn
+  onClearQueuedTurn, // Destructure clear queued turn
   error,
 }: GameBoardProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -61,10 +54,11 @@ export function GameBoard({
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showQueueModal, setShowQueueModal] = useState(false) // Add queue modal state
 
-  const currentPlayer = gameState.players[gameState.currentPlayerIndex]
+  const currentPlayer = gameState.players.find((p) => p.id === playerId)
+  const isMyTurn = currentPlayer?.id === gameState.players[gameState.currentPlayerIndex]?.id
   const myPlayer = gameState.players.find((p) => p.id === playerId)
-  const isMyTurn = currentPlayer?.id === playerId
   const myHand = myPlayer?.hand || []
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
@@ -299,56 +293,57 @@ export function GameBoard({
   })
 
   return (
-    <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
+    <div className={`min-h-screen ${currentStyle.background} text-foreground`}>
+      {/* Header */}
+      <header className="border-b border-border/50 bg-background/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {!isMyTurn && gameState.phase === "playing" && (
+              <Button variant="outline" size="sm" onClick={() => setShowQueueModal(true)} className="relative">
+                <Clock className="w-4 h-4 mr-1" />
+                Queue Move
+                {currentPlayer?.queuedTurn && (
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                    ✓
+                  </Badge>
+                )}
+              </Button>
+            )}
+
+            <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)}>
+              <Settings className="w-4 h-4" />
+            </Button>
+
+            {isHost && (
+              <Button variant="destructive" size="sm" onClick={onEndGame}>
+                <LogOut className="w-4 h-4 mr-1" />
+                End Game
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {currentPlayer && (
+        <QueueMoveModal
+          open={showQueueModal}
+          onOpenChange={setShowQueueModal}
+          gameState={gameState}
+          currentPlayer={currentPlayer}
+          onSaveQueue={onQueueTurn}
+          onClearQueue={onClearQueuedTurn}
+        />
+      )}
+
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
       <SettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
+        open={showSettingsModal}
+        onOpenChange={setShowSettingsModal}
         roomStyleId={roomStyleId}
         onStyleChange={onChangeRoomStyle}
         isHost={isHost}
       />
-
-      <header className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold text-foreground">Rummikub</h1>
-          <Badge variant="secondary" className="font-mono">
-            {roomCode}
-          </Badge>
-          <Badge variant="outline" className={cn("text-xs", currentStyle.accent)}>
-            {currentStyle.name}
-          </Badge>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Layers className="w-4 h-4" />
-            <span className="text-sm">{gameState.tilePool.length} tiles left</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Users className="w-4 h-4" />
-            <span className="text-sm">{gameState.players.length} players</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettingsModal(true)}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => setShowEndGameModal(true)}
-          >
-            <LogOut className="w-4 h-4" />
-            End Game
-          </Button>
-        </div>
-      </header>
 
       <div
         className={cn(

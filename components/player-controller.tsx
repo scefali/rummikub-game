@@ -19,6 +19,7 @@ import {
   ChevronUp,
   LogOut,
   Settings,
+  Clock,
 } from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
@@ -27,13 +28,14 @@ import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
+import { QueueMoveModal } from "@/components/queue-move-modal"
 import {
   generateId,
   isValidMeld,
   calculateProcessedMeldPoints,
   processMeld,
   findValidSplitPoint,
-  calculateHandPoints, // Import calculateHandPoints
+  calculateHandPoints,
 } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
@@ -42,13 +44,13 @@ interface PlayerControllerProps {
   playerId: string
   roomCode: string
   roomStyleId: RoomStyleId
-  isHost: boolean
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
   onEndGame: () => void
-  onChangeRoomStyle: (styleId: RoomStyleId) => void
+  onQueueTurn: (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => Promise<void>
+  onClearQueuedTurn: () => Promise<void>
   error?: string | null
 }
 
@@ -57,13 +59,13 @@ export function PlayerController({
   playerId,
   roomCode,
   roomStyleId,
-  isHost,
   onPlayTiles,
   onDrawTile,
   onEndTurn,
   onResetTurn,
   onEndGame,
-  onChangeRoomStyle,
+  onQueueTurn,
+  onClearQueuedTurn,
   error,
 }: PlayerControllerProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -73,6 +75,7 @@ export function PlayerController({
   const [handExpanded, setHandExpanded] = useState(true)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showQueueModal, setShowQueueModal] = useState(false)
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)
@@ -80,7 +83,6 @@ export function PlayerController({
   const myHand = myPlayer?.hand || []
   const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
-  const myPlayerCode = myPlayer?.playerCode
 
   const currentStyle = ROOM_STYLES[roomStyleId]
 
@@ -239,7 +241,6 @@ export function PlayerController({
       const splitPoint = findValidSplitPoint(meld)
       if (splitPoint === null) return
 
-      // Process to get correct tile order
       const processed = processMeld(meld)
       const firstPart = processed.tiles.slice(0, splitPoint)
       const secondPart = processed.tiles.slice(splitPoint)
@@ -307,16 +308,6 @@ export function PlayerController({
   }, [isMyTurn])
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {}
-
-    window.addEventListener("keydown", handleKeyDown)
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [])
-
-  useEffect(() => {
     if (!isMyTurn) {
       clearSelection()
     }
@@ -327,12 +318,22 @@ export function PlayerController({
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
       <SettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
+        open={showSettingsModal}
+        onOpenChange={setShowSettingsModal}
         roomStyleId={roomStyleId}
-        onStyleChange={onChangeRoomStyle}
-        isHost={isHost}
+        onStyleChange={() => {}}
+        isHost={false}
       />
+      {myPlayer && (
+        <QueueMoveModal
+          open={showQueueModal}
+          onOpenChange={setShowQueueModal}
+          gameState={gameState}
+          currentPlayer={myPlayer}
+          onSaveQueue={onQueueTurn}
+          onClearQueue={onClearQueuedTurn}
+        />
+      )}
 
       <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-2">
@@ -340,6 +341,17 @@ export function PlayerController({
           <Badge variant="secondary" className="font-mono text-xs">
             {roomCode}
           </Badge>
+          {!isMyTurn && gameState.phase === "playing" && (
+            <Button variant="outline" size="sm" onClick={() => setShowQueueModal(true)} className="h-7 px-2 relative">
+              <Clock className="w-3 h-3 mr-1" />
+              Queue
+              {myPlayer?.queuedTurn && (
+                <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                  ✓
+                </Badge>
+              )}
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowSettingsModal(true)}>
@@ -453,7 +465,7 @@ export function PlayerController({
                   onSplitMeld={isMyTurn && canUseTableTiles ? splitMeld : undefined}
                   compact
                   newTileIds={newTileIds}
-                  hidePoints={allPlayersStarted} // Hide points when all players have started
+                  hidePoints={allPlayersStarted}
                 />
               ))}
             </div>
@@ -558,7 +570,7 @@ export function PlayerController({
                     <GameTile
                       key={tile.id}
                       tile={tile}
-                      size="md"
+                      size="sm"
                       selected={selectedTiles.has(tile.id)}
                       onClick={isMyTurn ? () => toggleTileSelection(tile.id) : undefined}
                     />
