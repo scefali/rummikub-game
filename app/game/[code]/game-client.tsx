@@ -148,6 +148,24 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
   )
 
   const drawTile = useCallback(async (): Promise<Tile | null> => {
+    if (queueMode && queuedGameState && gameState) {
+      console.log("[v0] Simulating draw tile in queue mode")
+      // Simulate drawing by creating a placeholder tile
+      const simulatedTile: Tile = {
+        id: `queued-${Date.now()}-${Math.random()}`,
+        number: 0, // Placeholder - will be replaced with real tile on auto-play
+        color: "black",
+        isJoker: false,
+      }
+
+      setQueuedGameState({
+        ...queuedGameState,
+        hand: [...queuedGameState.hand, simulatedTile],
+      })
+
+      return simulatedTile
+    }
+
     try {
       const data = await apiCall({ action: "draw_tile", roomCode, playerId })
       pollGameState()
@@ -156,7 +174,7 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to draw tile")
       return null
     }
-  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+  }, [queueMode, queuedGameState, gameState, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const endTurn = useCallback(async () => {
     try {

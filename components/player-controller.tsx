@@ -26,6 +26,7 @@ import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
+import { QueuedMoveViewer } from "@/components/queued-move-viewer"
 import {
   generateId,
   isValidMeld,
@@ -81,11 +82,12 @@ export function PlayerController({
   const [handExpanded, setHandExpanded] = useState(true)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showQueuedMoveViewer, setShowQueuedMoveViewer] = useState(false)
 
   const currentPlayerIndex = gameState.currentPlayerIndex
   const currentPlayer = gameState.players[currentPlayerIndex]
   const myPlayer = gameState.players.find((p) => p.id === playerId)!
-  const isMyTurn = currentPlayer?.id === playerId
+  const isMyTurn = currentPlayer?.id === playerId || queueMode
 
   const myHand = queueMode && queuedGameState ? queuedGameState.hand : myPlayer.hand || []
   const workingArea = queueMode && queuedGameState ? queuedGameState.workingArea : gameState.workingArea || []
@@ -364,10 +366,21 @@ export function PlayerController({
   }, [onDrawTile])
 
   const handleResetTurn = useCallback(() => {
-    onResetTurn()
+    if (queueMode && onUpdateQueuedState) {
+      const myPlayer = gameState.players.find((p) => p.id === playerId)
+      if (myPlayer) {
+        onUpdateQueuedState({
+          melds: JSON.parse(JSON.stringify(gameState.melds)),
+          hand: JSON.parse(JSON.stringify(myPlayer.hand)),
+          workingArea: JSON.parse(JSON.stringify(gameState.workingArea)),
+        })
+      }
+    } else {
+      onResetTurn()
+    }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [onResetTurn])
+  }, [queueMode, onUpdateQueuedState, gameState, playerId, onResetTurn])
 
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
 
@@ -472,7 +485,7 @@ export function PlayerController({
   )
 
   return (
-    <div className="min-h-screen flex flex-col relative" style={{ background: currentStyle.background }}>
+    <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
       {queueMode && (
         <div className="bg-yellow-500/90 text-black px-3 py-2 text-center text-sm font-semibold flex items-center justify-center gap-2">
           <Clock className="w-3 h-3" />
@@ -497,18 +510,29 @@ export function PlayerController({
         </div>
         <div className="flex items-center gap-1.5">
           {!isMyTurn && !queueMode && (
-            <Button variant="outline" size="sm" onClick={() => onToggleQueueMode(true)} className="h-7 px-2 relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (myPlayer.queuedTurn) {
+                  setShowQueuedMoveViewer(true)
+                } else {
+                  onToggleQueueMode(true)
+                }
+              }}
+              className="h-7 px-2 relative"
+            >
               <Clock className="w-3 h-3 mr-1" />
               Queue
               {myPlayer.queuedTurn && (
-                <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px] leading-tight">
                   ✓
                 </Badge>
               )}
             </Button>
           )}
 
-          {myPlayer.queuedTurn && !queueMode && (
+          {myPlayer.queuedTurn && (
             <Button variant="ghost" size="sm" onClick={onClearQueuedTurn} className="h-7 px-2">
               <X className="w-3 h-3" />
             </Button>
@@ -754,6 +778,15 @@ export function PlayerController({
             </Button>
           </div>
         </div>
+      )}
+
+      {myPlayer.queuedTurn && (
+        <QueuedMoveViewer
+          open={showQueuedMoveViewer}
+          onOpenChange={setShowQueuedMoveViewer}
+          queuedTurn={myPlayer.queuedTurn}
+          onClearQueue={onClearQueuedTurn}
+        />
       )}
 
       <SettingsModal

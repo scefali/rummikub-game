@@ -24,6 +24,7 @@ import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
+import { QueuedMoveViewer } from "@/components/queued-move-viewer"
 import {
   generateId,
   isValidMeld,
@@ -80,6 +81,7 @@ export function GameBoard({
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showQueuedMoveViewer, setShowQueuedMoveViewer] = useState(false)
 
   const currentPlayerIndex = gameState.currentPlayerIndex
   const currentPlayer = gameState.players[currentPlayerIndex]
@@ -329,10 +331,21 @@ export function GameBoard({
   }, [onDrawTile])
 
   const handleResetTurn = useCallback(() => {
-    onResetTurn()
+    if (queueMode && onUpdateQueuedState && gameState) {
+      const myPlayer = gameState.players.find((p) => p.id === playerId)
+      if (myPlayer) {
+        onUpdateQueuedState({
+          melds: JSON.parse(JSON.stringify(gameState.melds)),
+          hand: JSON.parse(JSON.stringify(myPlayer.hand)),
+          workingArea: JSON.parse(JSON.stringify(gameState.workingArea)),
+        })
+      }
+    } else {
+      onResetTurn()
+    }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [onResetTurn])
+  }, [queueMode, onUpdateQueuedState, gameState, playerId, onResetTurn])
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
@@ -383,12 +396,7 @@ export function GameBoard({
   }, [onDrawTile, onEndTurn])
 
   return (
-    <div
-      className="min-h-screen flex flex-col relative overflow-hidden"
-      style={{
-        background: ROOM_STYLES[roomStyleId]?.background || ROOM_STYLES.classic.background,
-      }}
-    >
+    <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
       {queueMode && (
         <div className="bg-yellow-500/90 text-black px-4 py-2 text-center font-semibold flex items-center justify-center gap-2">
           <Clock className="w-4 h-4" />
@@ -408,16 +416,31 @@ export function GameBoard({
         <div className="container max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {!isMyTurn && !queueMode && (
-              <Button variant="outline" size="sm" onClick={() => onToggleQueueMode(true)} className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (myPlayer.queuedTurn) {
+                    setShowQueuedMoveViewer(true)
+                  } else {
+                    onToggleQueueMode(true)
+                  }
+                }}
+                className="relative"
+              >
                 <Clock className="w-4 h-4 mr-1" />
                 Queue Move
                 {myPlayer.queuedTurn && (
-                  <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px] leading-tight">
                     ✓
                   </Badge>
                 )}
               </Button>
             )}
+
+            <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)}>
+              <Settings className="w-4 h-4" />
+            </Button>
 
             {myPlayer.queuedTurn && !queueMode && (
               <Button variant="ghost" size="sm" onClick={onClearQueuedTurn}>
@@ -425,10 +448,6 @@ export function GameBoard({
                 Clear Queue
               </Button>
             )}
-
-            <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)}>
-              <Settings className="w-4 h-4" />
-            </Button>
 
             {isHost && (
               <Button variant="destructive" size="sm" onClick={onEndGame}>
@@ -449,6 +468,15 @@ export function GameBoard({
         onStyleChange={onChangeRoomStyle}
         isHost={isHost}
       />
+
+      {myPlayer.queuedTurn && (
+        <QueuedMoveViewer
+          open={showQueuedMoveViewer}
+          onOpenChange={setShowQueuedMoveViewer}
+          queuedTurn={myPlayer.queuedTurn}
+          onClearQueue={onClearQueuedTurn}
+        />
+      )}
 
       <div
         className={cn(
