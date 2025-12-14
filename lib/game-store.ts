@@ -371,6 +371,7 @@ export async function handleEndTurn(
     boardChanges: { added: string[]; removed: string[] }
     queuedAt: number
     baseRevision: number
+    currentRevision: number
   }[]
 }> {
   const room = await getRoom(roomCode)
@@ -596,21 +597,37 @@ export async function queueTurn(
   plannedHand: Tile[],
   plannedWorkingArea: Tile[],
 ): Promise<{ success: boolean; error?: string }> {
+  console.log("[v0] Queue turn request:", {
+    roomCode,
+    playerId: playerId.slice(0, 8),
+    meldsCount: plannedMelds.length,
+    handSize: plannedHand.length,
+    workingAreaSize: plannedWorkingArea.length,
+  })
+
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
+    console.log("[v0] Queue turn failed: Game not in progress")
     return { success: false, error: "Game not in progress" }
   }
 
   const player = room.gameState.players.find((p) => p.id === playerId)
   if (!player) {
+    console.log("[v0] Queue turn failed: Player not found")
     return { success: false, error: "Player not found" }
   }
 
   if (room.gameState.players[room.gameState.currentPlayerIndex].id === playerId) {
+    console.log("[v0] Queue turn failed: Cannot queue on your own turn")
     return { success: false, error: "Cannot queue turn when it's your turn" }
   }
 
   const baseBoardSignature = computeBoardSignature(room.gameState.melds)
+
+  console.log("[v0] Creating queued turn:", {
+    baseRevision: room.gameState.revision,
+    baseBoardSignature: baseBoardSignature.slice(0, 50) + "...",
+  })
 
   player.queuedTurn = {
     id: generateId(),
@@ -623,6 +640,7 @@ export async function queueTurn(
   }
 
   await setRoom(room)
+  console.log("[v0] Turn queued successfully")
   return { success: true }
 }
 
@@ -655,6 +673,7 @@ async function tryAutoPlayQueuedTurns(room: Room): Promise<{
     boardChanges: { added: string[]; removed: string[] }
     queuedAt: number
     baseRevision: number
+    currentRevision: number
   }[]
 }> {
   const autoPlayedPlayers: { name: string; email?: string; playerCode?: string; melds: Meld[] }[] = []
@@ -666,23 +685,40 @@ async function tryAutoPlayQueuedTurns(room: Room): Promise<{
     boardChanges: { added: string[]; removed: string[] }
     queuedAt: number
     baseRevision: number
+    currentRevision: number
   }[] = []
 
   const maxAttempts = room.gameState.players.length
   let attempts = 0
 
+  console.log("[v0] Starting auto-play attempt for queued turns")
+
   while (attempts < maxAttempts) {
     attempts++
     const currentPlayer = room.gameState.players[room.gameState.currentPlayerIndex]
 
+    console.log("[v0] Checking player for queued turn:", {
+      playerName: currentPlayer.name,
+      hasQueuedTurn: !!currentPlayer.queuedTurn,
+      attempt: attempts,
+    })
+
     if (!currentPlayer.queuedTurn) {
+      console.log("[v0] No queued turn found, stopping auto-play loop")
       break
     }
 
     const queuedTurn = currentPlayer.queuedTurn
     const currentBoardSignature = computeBoardSignature(room.gameState.melds)
-
     const boardChanged = queuedTurn.baseBoardSignature !== currentBoardSignature
+
+    console.log("[v0] Validating queued turn:", {
+      playerName: currentPlayer.name,
+      boardChanged,
+      baseRevision: queuedTurn.baseRevision,
+      currentRevision: room.gameState.revision,
+      queuedAt: new Date(queuedTurn.queuedAt).toISOString(),
+    })
 
     const validation = canEndTurn(
       { ...currentPlayer, hand: queuedTurn.plannedHand },
@@ -695,6 +731,13 @@ async function tryAutoPlayQueuedTurns(room: Room): Promise<{
 
     if (!validation.valid || boardChanged) {
       const reason = boardChanged ? "Board changed since turn was queued" : validation.reason || "Invalid queued state"
+
+      console.log("[v0] Queued turn validation failed:", {
+        playerName: currentPlayer.name,
+        reason,
+        boardChanged,
+        validationReason: validation.reason,
+      })
 
       const oldTileIds = new Set(queuedTurn.baseBoardSignature.split(",").filter((id) => id))
       const newTileIds = new Set(currentBoardSignature.split(",").filter((id) => id))
@@ -716,6 +759,13 @@ async function tryAutoPlayQueuedTurns(room: Room): Promise<{
         }
       }
 
+      console.log("[v0] Board changes detected:", {
+        added: added.length,
+        removed: removed.length,
+        addedTiles: added.slice(0, 3),
+        removedTiles: removed.slice(0, 3),
+      })
+
       failedPlayers.push({
         name: currentPlayer.name,
         email: currentPlayer.email,
@@ -724,11 +774,20 @@ async function tryAutoPlayQueuedTurns(room: Room): Promise<{
         boardChanges: { added, removed },
         queuedAt: queuedTurn.queuedAt,
         baseRevision: queuedTurn.baseRevision,
+        currentRevision: room.gameState.revision,
       })
 
       currentPlayer.queuedTurn = null
+      await setRoom(room)
+      console.log("[v0] Queued turn cleared due to validation failure")
       break
     }
+
+    console.log("[v0] Queued turn validated successfully, applying:", {
+      playerName: currentPlayer.name,
+      meldsCount: queuedTurn.plannedMelds.length,
+      handSize: queuedTurn.plannedHand.length,
+    })
 
     room.gameState.melds = queuedTurn.plannedMelds
     currentPlayer.hand = queuedTurn.plannedHand
@@ -755,8 +814,14 @@ async function tryAutoPlayQueuedTurns(room: Room): Promise<{
 
     currentPlayer.queuedTurn = null
 
+    console.log("[v0] Queued turn auto-played successfully:", {
+      playerName: currentPlayer.name,
+      newRevision: room.gameState.revision,
+    })
+
     const endCheck = checkGameEnd(room.gameState)
     if (endCheck.ended) {
+      console.log("[v0] Game ended after auto-play:", { winner: endCheck.winner })
       room.gameState.phase = "ended"
       room.gameState.winner = endCheck.winner || null
       break
@@ -767,7 +832,17 @@ async function tryAutoPlayQueuedTurns(room: Room): Promise<{
     room.gameState.turnStartHand = [...nextPlayerObj.hand]
     room.gameState.turnStartMelds = JSON.parse(JSON.stringify(room.gameState.melds))
     room.gameState.workingArea = []
+
+    console.log("[v0] Advanced to next player:", {
+      nextPlayerName: nextPlayerObj.name,
+      hasQueuedTurn: !!nextPlayerObj.queuedTurn,
+    })
   }
+
+  console.log("[v0] Auto-play complete:", {
+    autoPlayedCount: autoPlayedPlayers.length,
+    failedCount: failedPlayers.length,
+  })
 
   return { autoPlayedPlayers, failedPlayers }
 }

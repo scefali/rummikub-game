@@ -20,6 +20,7 @@ interface QueuedTurnFailedEmailProps {
   boardChanges: { added: string[]; removed: string[] }
   queuedAt: number
   baseRevision: number
+  currentRevision?: number
   roomStyleId?: RoomStyleId
 }
 
@@ -31,6 +32,7 @@ export function QueuedTurnFailedEmail({
   boardChanges,
   queuedAt,
   baseRevision,
+  currentRevision,
   roomStyleId = "classic",
 }: QueuedTurnFailedEmailProps) {
   const style = EMAIL_STYLES[roomStyleId]
@@ -114,6 +116,13 @@ export function QueuedTurnFailedEmail({
 
             <Text style={{ fontSize: "12px", color: style.textColor + "80" }}>
               Queued at: {queuedTime} | Board version: {baseRevision}
+              {currentRevision && ` → ${currentRevision}`}
+            </Text>
+
+            <Text style={{ fontSize: "12px", color: style.textColor + "80", marginTop: "8px" }}>
+              {currentRevision && baseRevision !== currentRevision
+                ? `The board changed ${currentRevision - baseRevision} times since you queued this turn.`
+                : "The board state did not match your queued move."}
             </Text>
           </Section>
 

@@ -27,6 +27,12 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
   const [roomStyleId, setRoomStyleId] = useState<RoomStyleId>("classic")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [queueMode, setQueueMode] = useState(false)
+  const [queuedGameState, setQueuedGameState] = useState<{
+    melds: Meld[]
+    hand: Tile[]
+    workingArea: Tile[]
+  } | null>(null)
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const isPollingRef = useRef(false)
@@ -205,6 +211,14 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
 
   const queueTurn = useCallback(
     async (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => {
+      console.log("[v0] Queueing turn:", {
+        roomCode,
+        playerId: playerId.slice(0, 8),
+        meldsCount: plannedMelds.length,
+        handSize: plannedHand.length,
+        workingAreaSize: plannedWorkingArea.length,
+      })
+
       try {
         await apiCall({
           action: "queue_turn",
@@ -215,7 +229,12 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
           plannedWorkingArea,
         })
         pollGameState()
+        setQueueMode(false)
+        setQueuedGameState(null)
+
+        console.log("[v0] Turn queued successfully")
       } catch (err) {
+        console.error("[v0] Queue turn failed:", err)
         setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to queue turn")
       }
     },
@@ -223,13 +242,39 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
   )
 
   const clearQueuedTurn = useCallback(async () => {
+    console.log("[v0] Clearing queued turn:", { roomCode, playerId: playerId.slice(0, 8) })
+
     try {
       await apiCall({ action: "clear_queued_turn", roomCode, playerId })
       pollGameState()
+      console.log("[v0] Queued turn cleared successfully")
     } catch (err) {
+      console.error("[v0] Clear queued turn failed:", err)
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to clear queued turn")
     }
   }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+
+  const handleToggleQueueMode = useCallback(
+    (enabled: boolean) => {
+      console.log("[v0] Toggling queue mode:", { enabled, roomCode, playerId: playerId.slice(0, 8) })
+
+      if (enabled && gameState) {
+        const myPlayer = gameState.players.find((p) => p.id === playerId)
+        if (myPlayer) {
+          setQueuedGameState({
+            melds: JSON.parse(JSON.stringify(gameState.melds)),
+            hand: JSON.parse(JSON.stringify(myPlayer.hand)),
+            workingArea: JSON.parse(JSON.stringify(gameState.workingArea)),
+          })
+        }
+      } else {
+        setQueuedGameState(null)
+      }
+
+      setQueueMode(enabled)
+    },
+    [gameState, playerId, roomCode],
+  )
 
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
@@ -307,6 +352,10 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
         onEndGame={endGame}
         onQueueTurn={queueTurn}
         onClearQueuedTurn={clearQueuedTurn}
+        queueMode={queueMode}
+        onToggleQueueMode={handleToggleQueueMode}
+        queuedGameState={queuedGameState}
+        onUpdateQueuedState={setQueuedGameState}
         error={error}
       />
     )
@@ -327,6 +376,10 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
       onChangeRoomStyle={changeRoomStyle}
       onQueueTurn={queueTurn}
       onClearQueuedTurn={clearQueuedTurn}
+      queueMode={queueMode}
+      onToggleQueueMode={handleToggleQueueMode}
+      queuedGameState={queuedGameState}
+      onUpdateQueuedState={setQueuedGameState}
       error={error}
     />
   )

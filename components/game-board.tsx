@@ -4,7 +4,19 @@ import { useState, useCallback, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Clock, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, LogOut, Settings } from "lucide-react"
+import {
+  Clock,
+  ArrowRight,
+  AlertCircle,
+  Plus,
+  X,
+  Wrench,
+  ArrowLeft,
+  RotateCcw,
+  LogOut,
+  Settings,
+  Send,
+} from "lucide-react"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
@@ -12,8 +24,14 @@ import { GameTile } from "@/components/game-tile"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
-import { QueueMoveModal } from "@/components/queue-move-modal" // Import QueueMoveModal
-import { generateId, isValidMeld, processMeld, findValidSplitPoint, calculateHandPoints } from "@/lib/game-logic"
+import {
+  generateId,
+  isValidMeld,
+  processMeld,
+  findValidSplitPoint,
+  calculateHandPoints,
+  canEndTurn,
+} from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface GameBoardProps {
@@ -28,8 +46,12 @@ interface GameBoardProps {
   onResetTurn: () => void
   onEndGame: () => void
   onChangeRoomStyle: (styleId: RoomStyleId) => void
-  onQueueTurn: (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => Promise<void> // Add queue turn prop
-  onClearQueuedTurn: () => Promise<void> // Add clear queued turn prop
+  onQueueTurn: (plannedMelds: Meld[], plannedHand: Tile[], plannedWorkingArea: Tile[]) => Promise<void>
+  onClearQueuedTurn: () => Promise<void>
+  queueMode: boolean
+  onToggleQueueMode: (enabled: boolean) => void
+  queuedGameState: { melds: Meld[]; hand: Tile[]; workingArea: Tile[] } | null
+  onUpdateQueuedState: (state: { melds: Meld[]; hand: Tile[]; workingArea: Tile[] } | null) => void
   error: string | null
 }
 
@@ -45,8 +67,12 @@ export function GameBoard({
   onResetTurn,
   onEndGame,
   onChangeRoomStyle,
-  onQueueTurn, // Destructure queue turn
-  onClearQueuedTurn, // Destructure clear queued turn
+  onQueueTurn,
+  onClearQueuedTurn,
+  queueMode,
+  onToggleQueueMode,
+  queuedGameState,
+  onUpdateQueuedState,
   error,
 }: GameBoardProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
@@ -54,14 +80,15 @@ export function GameBoard({
   const [drawnTile, setDrawnTile] = useState<Tile | null>(null)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [showQueueModal, setShowQueueModal] = useState(false) // Add queue modal state
 
-  const currentPlayer = gameState.players.find((p) => p.id === playerId)
-  const isMyTurn = currentPlayer?.id === gameState.players[gameState.currentPlayerIndex]?.id
-  const myPlayer = gameState.players.find((p) => p.id === playerId)
-  const myHand = myPlayer?.hand || []
-  const workingArea = gameState.workingArea || []
-  const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
+  const currentPlayerIndex = gameState.currentPlayerIndex
+  const currentPlayer = gameState.players[currentPlayerIndex]
+  const myPlayer = gameState.players.find((p) => p.id === playerId)!
+  const isMyTurn = currentPlayer?.id === playerId || queueMode
+  const myHand = queueMode && queuedGameState ? queuedGameState.hand : myPlayer.hand || []
+  const workingArea = queueMode && queuedGameState ? queuedGameState.workingArea : gameState.workingArea || []
+  const melds = queueMode && queuedGameState ? queuedGameState.melds : gameState.melds
+  const canUseTableTiles = myPlayer.hasInitialMeld
   const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
 
   const currentStyle = ROOM_STYLES[roomStyleId]
@@ -140,11 +167,15 @@ export function GameBoard({
       tiles: allSelectedTiles,
     }
 
-    const newMelds = [...gameState.melds, newMeld]
-    onPlayTiles(newMelds, remainingHand, remainingWorking)
+    const newMelds = [...melds, newMeld]
+    if (queueMode) {
+      onUpdateQueuedState({ melds: newMelds, hand: remainingHand, workingArea: remainingWorking })
+    } else {
+      onPlayTiles(newMelds, remainingHand, remainingWorking)
+    }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [myHand, workingArea, selectedTiles, selectedWorkingTiles, gameState.melds, onPlayTiles])
+  }, [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles, queueMode, onUpdateQueuedState])
 
   const addToMeld = useCallback(
     (meldId: string) => {
@@ -153,31 +184,35 @@ export function GameBoard({
       const remainingHand = myHand.filter((t) => !selectedTiles.has(t.id))
       const remainingWorking = workingArea.filter((t) => !selectedWorkingTiles.has(t.id))
 
-      const updatedMelds = gameState.melds.map((m) => {
+      const updatedMelds = melds.map((m) => {
         if (m.id === meldId) {
           return { ...m, tiles: [...m.tiles, ...allSelectedTiles] }
         }
         return m
       })
 
-      onPlayTiles(updatedMelds, remainingHand, remainingWorking)
+      if (queueMode) {
+        onUpdateQueuedState({ melds: updatedMelds, hand: remainingHand, workingArea: remainingWorking })
+      } else {
+        onPlayTiles(updatedMelds, remainingHand, remainingWorking)
+      }
       setSelectedTiles(new Set())
       setSelectedWorkingTiles(new Set())
     },
-    [myHand, workingArea, selectedTiles, selectedWorkingTiles, gameState.melds, onPlayTiles],
+    [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles, queueMode, onUpdateQueuedState],
   )
 
   const takeTileFromMeld = useCallback(
     (tileId: string, meldId: string) => {
       if (!canUseTableTiles) return
 
-      const meld = gameState.melds.find((m) => m.id === meldId)
+      const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
 
       const tile = meld.tiles.find((t) => t.id === tileId)
       if (!tile) return
 
-      const updatedMelds = gameState.melds
+      const updatedMelds = melds
         .map((m) => {
           if (m.id === meldId) {
             return { ...m, tiles: m.tiles.filter((t) => t.id !== tileId) }
@@ -186,33 +221,42 @@ export function GameBoard({
         })
         .filter((m) => m.tiles.length > 0)
 
-      onPlayTiles(updatedMelds, myHand, [...workingArea, tile])
+      if (queueMode) {
+        onUpdateQueuedState({ melds: updatedMelds, hand: [...myHand, tile], workingArea })
+      } else {
+        onPlayTiles(updatedMelds, myHand, [...workingArea, tile])
+      }
 
       setSelectedWorkingTiles((prev) => new Set([...prev, tileId]))
     },
-    [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
+    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, onUpdateQueuedState],
   )
 
   const breakMeld = useCallback(
     (meldId: string) => {
       if (!canUseTableTiles) return
 
-      const meld = gameState.melds.find((m) => m.id === meldId)
+      const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
 
-      const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
-      onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
+      const updatedMelds = melds.filter((m) => m.id !== meldId)
+
+      if (queueMode) {
+        onUpdateQueuedState({ melds: updatedMelds, hand: [...myHand, ...meld.tiles], workingArea })
+      } else {
+        onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
+      }
 
       setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
     },
-    [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
+    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, onUpdateQueuedState],
   )
 
   const splitMeld = useCallback(
     (meldId: string) => {
       if (!canUseTableTiles) return
 
-      const meld = gameState.melds.find((m) => m.id === meldId)
+      const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
 
       const splitPoint = findValidSplitPoint(meld)
@@ -223,13 +267,17 @@ export function GameBoard({
       const firstPart = processed.tiles.slice(0, splitPoint)
       const secondPart = processed.tiles.slice(splitPoint)
 
-      const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
+      const updatedMelds = melds.filter((m) => m.id !== meldId)
       updatedMelds.push({ id: generateId(), tiles: firstPart })
       updatedMelds.push({ id: generateId(), tiles: secondPart })
 
-      onPlayTiles(updatedMelds, myHand, workingArea)
+      if (queueMode) {
+        onUpdateQueuedState({ melds: updatedMelds, hand: myHand, workingArea })
+      } else {
+        onPlayTiles(updatedMelds, myHand, workingArea)
+      }
     },
-    [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
+    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles, queueMode, onUpdateQueuedState],
   )
 
   const returnSelectedToHand = useCallback(() => {
@@ -249,9 +297,22 @@ export function GameBoard({
       }
     })
 
-    onPlayTiles(gameState.melds, [...myHand, ...tilesToReturn], tilesToKeep)
+    if (queueMode) {
+      onUpdateQueuedState({ melds, hand: [...myHand, ...tilesToReturn], workingArea: tilesToKeep })
+    } else {
+      onPlayTiles(melds, [...myHand, ...tilesToReturn], tilesToKeep)
+    }
     setSelectedWorkingTiles(new Set())
-  }, [workingArea, selectedWorkingTiles, gameState.turnStartHand, gameState.melds, myHand, onPlayTiles])
+  }, [
+    workingArea,
+    selectedWorkingTiles,
+    gameState.turnStartHand,
+    melds,
+    myHand,
+    onPlayTiles,
+    queueMode,
+    onUpdateQueuedState,
+  ])
 
   const clearSelection = useCallback(() => {
     setSelectedTiles(new Set())
@@ -281,7 +342,7 @@ export function GameBoard({
     myHand.length !== gameState.turnStartHand.length ||
     !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
 
-  const lastSeenTileIds = new Set(myPlayer?.lastSeenMeldTileIds || [])
+  const lastSeenTileIds = new Set(myPlayer.lastSeenMeldTileIds || [])
 
   const newTileIds = new Set<string>()
   gameState.melds.forEach((meld) => {
@@ -292,21 +353,76 @@ export function GameBoard({
     })
   })
 
+  const handleEndTurn = useCallback(async () => {
+    if (queueMode && queuedGameState) {
+      console.log("[v0] Saving queued turn from game board")
+      await onQueueTurn(queuedGameState.melds, queuedGameState.hand, queuedGameState.workingArea)
+      return
+    }
+
+    const validation = canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!)
+    if (!validation.canEnd) {
+      return
+    }
+
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+    await onEndTurn()
+  }, [queueMode, queuedGameState, onQueueTurn, myPlayer, melds, myHand, workingArea, gameState.rules, onEndTurn])
+
+  const canEnd = totalSelected === 0 || wouldBeValidMeld
+
+  const handleDraw = useCallback(async () => {
+    const tile = await onDrawTile()
+    if (tile) {
+      setDrawnTile(tile)
+    }
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+    await onEndTurn()
+  }, [onDrawTile, onEndTurn])
+
   return (
-    <div className={`min-h-screen ${currentStyle.background} text-foreground`}>
-      {/* Header */}
-      <header className="border-b border-border/50 bg-background/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-3 py-2 flex items-center justify-between">
+    <div
+      className="min-h-screen flex flex-col relative overflow-hidden"
+      style={{
+        background: ROOM_STYLES[roomStyleId]?.background || ROOM_STYLES.classic.background,
+      }}
+    >
+      {queueMode && (
+        <div className="bg-yellow-500/90 text-black px-4 py-2 text-center font-semibold flex items-center justify-center gap-2">
+          <Clock className="w-4 h-4" />
+          Queue Mode Active - Planning your next move
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onToggleQueueMode(false)}
+            className="ml-2 h-6 bg-black/20 hover:bg-black/30"
+          >
+            Exit Queue Mode
+          </Button>
+        </div>
+      )}
+
+      <header className="border-b bg-card/95 backdrop-blur">
+        <div className="container max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {!isMyTurn && gameState.phase === "playing" && (
-              <Button variant="outline" size="sm" onClick={() => setShowQueueModal(true)} className="relative">
+            {!isMyTurn && !queueMode && (
+              <Button variant="outline" size="sm" onClick={() => onToggleQueueMode(true)} className="relative">
                 <Clock className="w-4 h-4 mr-1" />
                 Queue Move
-                {currentPlayer?.queuedTurn && (
+                {myPlayer.queuedTurn && (
                   <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
                     ✓
                   </Badge>
                 )}
+              </Button>
+            )}
+
+            {myPlayer.queuedTurn && !queueMode && (
+              <Button variant="ghost" size="sm" onClick={onClearQueuedTurn}>
+                <X className="w-4 h-4 mr-1" />
+                Clear Queue
               </Button>
             )}
 
@@ -323,17 +439,6 @@ export function GameBoard({
           </div>
         </div>
       </header>
-
-      {currentPlayer && (
-        <QueueMoveModal
-          open={showQueueModal}
-          onOpenChange={setShowQueueModal}
-          gameState={gameState}
-          currentPlayer={currentPlayer}
-          onSaveQueue={onQueueTurn}
-          onClearQueue={onClearQueuedTurn}
-        />
-      )}
 
       <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
       <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
@@ -362,7 +467,7 @@ export function GameBoard({
           </span>
         ) : (
           <span>
-            {"Waiting for"} <strong>{currentPlayer?.name}</strong>
+            {"Waiting for"} <strong>{currentPlayer.name}</strong>
             {"'s turn..."}
           </span>
         )}
@@ -381,16 +486,16 @@ export function GameBoard({
             <div>
               <h2 className="text-lg font-semibold text-foreground mb-1">Table</h2>
               <p className="text-sm text-muted-foreground">
-                {gameState.melds.length === 0
+                {melds.length === 0
                   ? "No melds on the table yet"
-                  : `${gameState.melds.length} meld${gameState.melds.length > 1 ? "s" : ""} on table`}
+                  : `${melds.length} meld${melds.length > 1 ? "s" : ""} on table`}
                 {canUseTableTiles && isMyTurn && " - Click tiles to rearrange"}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-4">
-            {gameState.melds.map((meld) => (
+            {melds.map((meld) => (
               <MeldDisplay
                 key={meld.id}
                 meld={meld}
@@ -405,7 +510,7 @@ export function GameBoard({
               />
             ))}
 
-            {gameState.melds.length === 0 && (
+            {melds.length === 0 && (
               <Card className="w-full max-w-md p-8 border-dashed border-2 bg-transparent flex items-center justify-center">
                 <p className="text-muted-foreground text-center">
                   Place tiles here to create melds
@@ -539,7 +644,7 @@ export function GameBoard({
                       className="gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                       <RotateCcw className="w-4 h-4" />
-                      Reset
+                      Reset Move
                     </Button>
                   )}
                   <Button
@@ -550,9 +655,16 @@ export function GameBoard({
                   >
                     Draw Tile
                   </Button>
-                  <Button size="sm" onClick={onEndTurn} className="cursor-pointer">
-                    End Turn
+                  <Button onClick={handleEndTurn} disabled={!canEnd} size="sm" className="bg-primary">
+                    <Send className="w-4 h-4 mr-1" />
+                    {queueMode ? "Save Queue" : "End Turn"}
                   </Button>
+                  {isMyTurn && totalSelected === 0 && canEnd && (
+                    <Button onClick={handleDraw} variant="outline" size="sm">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Draw & Pass
+                    </Button>
+                  )}
                 </>
               )}
             </div>
