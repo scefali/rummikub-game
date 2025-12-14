@@ -654,19 +654,21 @@ export function PlayerController({
             <button
               onClick={() => setHandExpanded(!handExpanded)}
               className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+              disabled={queueMode}
             >
               <Hand className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Your Hand ({myHand.length})
               </h3>
-              {handExpanded ? (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              )}
+              {!queueMode &&
+                (handExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ))}
             </button>
 
-            {totalSelected > 0 && isMyTurn && (
+            {totalSelected > 0 && (isMyTurn || queueMode) && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{totalSelected} selected</span>
                 <Button
@@ -686,7 +688,7 @@ export function PlayerController({
             )}
           </div>
 
-          {handExpanded && (
+          {(handExpanded || queueMode) && (
             <>
               {!myPlayer.hasInitialMeld && (
                 <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
@@ -707,7 +709,7 @@ export function PlayerController({
                       tile={tile}
                       size="sm"
                       selected={selectedTiles.has(tile.id)}
-                      onClick={isMyTurn ? () => toggleTileSelection(tile.id) : undefined}
+                      onClick={isMyTurn || queueMode ? () => toggleTileSelection(tile.id) : undefined}
                     />
                   ))}
 
@@ -719,7 +721,7 @@ export function PlayerController({
         </div>
       </div>
 
-      {isMyTurn && (
+      {(isMyTurn || queueMode) && (
         <div className="flex-shrink-0 p-3 border-t border-border/50 bg-card/80 backdrop-blur-sm safe-area-pb">
           {hasChangesToReset && (
             <div className="flex justify-center gap-4 mb-2">
