@@ -397,11 +397,11 @@ export function GameBoard({
 
   const handleDraw = useCallback(async () => {
     if (queueMode && queuedGameState && onUpdateQueuedState) {
-      // In queue mode, simulate drawing and immediately end turn locally
-      console.log("[v0] Queue mode: Simulating draw & pass (no API call)")
+      // Queue mode: Just simulate the draw action locally, don't submit queue yet
+      console.log("[v0] Queue mode: Simulating draw tile locally")
       const simulatedTile: Tile = {
         id: `queued-draw-${Date.now()}-${Math.random()}`,
-        number: 0, // Placeholder
+        number: 0, // Placeholder - will be replaced with real tile when auto-played
         color: "black",
         isJoker: false,
       }
@@ -414,13 +414,12 @@ export function GameBoard({
       setDrawnTile(simulatedTile)
       setSelectedTiles(new Set())
       setSelectedWorkingTiles(new Set())
-
-      // In queue mode, immediately queue the turn after drawing
-      await onQueueTurn(queuedGameState.melds, [...queuedGameState.hand, simulatedTile], queuedGameState.workingArea)
+      console.log("[v0] Simulated tile added to queued hand. User must click 'Queue Move' to save.")
       return
     }
 
-    // Normal mode: actually draw from API and end turn
+    // Normal mode: Draw from API and end turn
+    console.log("[v0] Normal mode: Drawing tile from API and ending turn")
     const tile = await onDrawTile()
     if (tile) {
       setDrawnTile(tile)
@@ -428,7 +427,7 @@ export function GameBoard({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
-  }, [queueMode, queuedGameState, onUpdateQueuedState, onQueueTurn, onDrawTile, onEndTurn])
+  }, [queueMode, queuedGameState, onUpdateQueuedState, onDrawTile, onEndTurn])
 
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
@@ -718,11 +717,7 @@ export function GameBoard({
                   >
                     Draw Tile
                   </Button>
-                  <Button
-                    disabled={!canEnd}
-                    onClick={handleEndTurn}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
-                  >
+                  <Button onClick={handleEndTurn} size="lg" disabled={!canEnd}>
                     {queueMode ? "Queue Move" : "End Turn"}
                   </Button>
                   {isMyTurn && totalSelected === 0 && canEnd && (

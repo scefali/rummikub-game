@@ -83,6 +83,7 @@ export function PlayerController({
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showQueuedMoveViewer, setShowQueuedMoveViewer] = useState(false)
+  const [hasPlayed, setHasPlayed] = useState(false)
 
   const currentPlayerIndex = gameState.currentPlayerIndex
   const currentPlayer = gameState.players[currentPlayerIndex]
@@ -458,6 +459,7 @@ export function PlayerController({
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
     await onEndTurn()
+    setHasPlayed(true)
   }, [queueMode, queuedGameState, onQueueTurn, myPlayer, melds, myHand, workingArea, gameState.rules, onEndTurn])
 
   const handleTileToBoard = useCallback(
@@ -505,6 +507,39 @@ export function PlayerController({
     },
     [queueMode, queuedGameState, onUpdateQueuedState, myHand, workingArea, melds, onPlayTiles],
   )
+
+  const handleDrawAndPass = useCallback(async () => {
+    if (queueMode && queuedGameState && onUpdateQueuedState) {
+      // Queue mode: Just simulate the draw action locally, don't submit queue yet
+      console.log("[v0] Queue mode: Simulating draw tile locally")
+      const simulatedTile: Tile = {
+        id: `queued-draw-${Date.now()}-${Math.random()}`,
+        number: 0, // Placeholder - will be replaced with real tile when auto-played
+        color: "black",
+        isJoker: false,
+      }
+
+      onUpdateQueuedState({
+        ...queuedGameState,
+        hand: [...queuedGameState.hand, simulatedTile],
+      })
+
+      setDrawnTile(simulatedTile)
+      console.log("[v0] Simulated tile added to queued hand. User must click 'Queue Move' to save.")
+      return
+    }
+
+    // Normal mode: Draw from API and end turn
+    console.log("[v0] Normal mode: Drawing tile from API and ending turn")
+    const tile = await onDrawTile()
+    if (tile) {
+      setDrawnTile(tile)
+    }
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+    await onEndTurn()
+    setHasPlayed(true)
+  }, [queueMode, queuedGameState, onUpdateQueuedState, onDrawTile, onEndTurn])
 
   const canEnd =
     isMyTurn && myPlayer.hasInitialMeld && canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!).canEnd
@@ -786,19 +821,21 @@ export function PlayerController({
             </div>
           )}
           <div className="flex gap-2">
+            {isMyTurn && (
+              <Button
+                onClick={handleDrawAndPass}
+                variant="outline"
+                className="flex-1 h-12 gap-2 bg-transparent text-base cursor-pointer active:scale-95 transition-transform hover:bg-secondary/50"
+                disabled={hasPlayed}
+              >
+                <Download className="w-5 h-5" />
+                Draw & Pass
+              </Button>
+            )}
             <Button
-              variant="outline"
-              className="flex-1 h-12 gap-2 bg-transparent text-base cursor-pointer active:scale-95 transition-transform hover:bg-secondary/50"
-              onClick={handleDrawTile}
-            >
-              <Download className="w-5 h-5" />
-              Draw & Pass
-            </Button>
-            <Button
-              variant={canEnd ? "default" : "secondary"}
-              disabled={!canEnd}
-              className="flex-1 h-12 gap-2 text-base cursor-pointer active:scale-95 transition-transform"
               onClick={handleEndTurn}
+              className="flex-1 h-12 gap-2 text-base cursor-pointer active:scale-95 transition-transform"
+              disabled={!canEnd}
             >
               <CheckCircle className="w-5 h-5" />
               {queueMode ? "Queue Move" : "End Turn"}

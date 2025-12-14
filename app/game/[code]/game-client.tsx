@@ -149,8 +149,9 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
 
   const drawTile = useCallback(async (): Promise<Tile | null> => {
     if (queueMode) {
-      console.log("[v0] ERROR: drawTile() called in queue mode - this should never happen!")
-      console.log("[v0] Queue mode actions should be handled in components, not here")
+      console.error("[v0] CRITICAL ERROR: drawTile() called in queue mode!")
+      console.error("[v0] Stack trace:", new Error().stack)
+      console.error("[v0] This should never happen. Queue mode should handle draws locally in components.")
       return null
     }
 
