@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Clock, ArrowRight, AlertCircle, Plus, X, Wrench, ArrowLeft, RotateCcw, LogOut, Settings } from "lucide-react"
-import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
+import type { Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
 import { MeldDisplay } from "@/components/meld-display"
 import { GameTile } from "@/components/game-tile"
@@ -25,7 +25,6 @@ import {
 import { cn } from "@/lib/utils"
 
 interface GameBoardProps {
-  gameState: GameState
   playerId: string
   roomCode: string
   roomStyleId: RoomStyleId
@@ -43,7 +42,6 @@ interface GameBoardProps {
 }
 
 export function GameBoard({
-  gameState,
   playerId,
   roomCode,
   roomStyleId,
@@ -59,7 +57,7 @@ export function GameBoard({
   onToggleQueueMode,
   error,
 }: GameBoardProps) {
-  const { queueMode, effectiveMelds, effectiveHand, effectiveWorkingArea, hasQueuedTurn } = useQueueMode()
+  const { queueMode, effectiveGameState, effectiveMelds, effectiveHand, effectiveWorkingArea } = useQueueMode()
 
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
@@ -67,54 +65,6 @@ export function GameBoard({
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showQueuedMoveViewer, setShowQueuedMoveViewer] = useState(false)
-
-  const currentPlayerIndex = gameState.currentPlayerIndex
-  const currentPlayer = gameState.players[currentPlayerIndex]
-  const myPlayer = gameState.players.find((p) => p.id === playerId)
-  const isMyTurn = currentPlayer?.id === playerId || queueMode
-  const myHand = effectiveHand
-  const workingArea = effectiveWorkingArea
-  const melds = effectiveMelds
-  const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
-  const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
-
-  const currentStyle = ROOM_STYLES[roomStyleId]
-
-  const allPlayersStarted = gameState.players.every((p) => p.hasInitialMeld)
-
-  useEffect(() => {
-    if (!isMyTurn) {
-      setSelectedTiles(new Set())
-      setSelectedWorkingTiles(new Set())
-    }
-  }, [isMyTurn])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setSelectedTiles(new Set())
-        setSelectedWorkingTiles(new Set())
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
-
-  const sortedTiles = myPlayer
-    ? [...myHand].sort((a, b) => {
-        if (a.isJoker && !b.isJoker) return 1
-        if (!a.isJoker && b.isJoker) return -1
-        if (a.color !== b.color) return a.color.localeCompare(b.color)
-        return a.number - b.number
-      })
-    : []
-
-  const sortedWorkingArea = [...workingArea].sort((a, b) => {
-    if (a.isJoker && !b.isJoker) return 1
-    if (!a.isJoker && b.isJoker) return -1
-    if (a.color !== b.color) return a.color.localeCompare(b.color)
-    return a.number - b.number
-  })
 
   const toggleTileSelection = useCallback((tileId: string) => {
     setSelectedTiles((prev) => {
@@ -140,12 +90,16 @@ export function GameBoard({
     })
   }, [])
 
-  const allSelectedTiles = [
-    ...myHand.filter((t) => selectedTiles.has(t.id)),
-    ...workingArea.filter((t) => selectedWorkingTiles.has(t.id)),
-  ]
-
   const createMeld = useCallback(() => {
+    const myHand = effectiveHand
+    const workingArea = effectiveWorkingArea
+    const melds = effectiveMelds
+
+    const allSelectedTiles = [
+      ...myHand.filter((t) => selectedTiles.has(t.id)),
+      ...workingArea.filter((t) => selectedWorkingTiles.has(t.id)),
+    ]
+
     if (allSelectedTiles.length < 3) return
 
     const remainingHand = myHand.filter((t) => !selectedTiles.has(t.id))
@@ -160,10 +114,19 @@ export function GameBoard({
     onPlayTiles(newMelds, remainingHand, remainingWorking)
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles])
+  }, [effectiveHand, effectiveWorkingArea, effectiveMelds, selectedTiles, selectedWorkingTiles, onPlayTiles])
 
   const addToMeld = useCallback(
     (meldId: string) => {
+      const myHand = effectiveHand
+      const workingArea = effectiveWorkingArea
+      const melds = effectiveMelds
+
+      const allSelectedTiles = [
+        ...myHand.filter((t) => selectedTiles.has(t.id)),
+        ...workingArea.filter((t) => selectedWorkingTiles.has(t.id)),
+      ]
+
       if (allSelectedTiles.length === 0) return
 
       const remainingHand = myHand.filter((t) => !selectedTiles.has(t.id))
@@ -180,12 +143,18 @@ export function GameBoard({
       setSelectedTiles(new Set())
       setSelectedWorkingTiles(new Set())
     },
-    [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles],
+    [effectiveHand, effectiveWorkingArea, effectiveMelds, selectedTiles, selectedWorkingTiles, onPlayTiles],
   )
 
   const takeTileFromMeld = useCallback(
     (tileId: string, meldId: string) => {
-      if (!canUseTableTiles) return
+      const gameState = effectiveGameState
+      const myPlayer = gameState?.players.find((p) => p.id === playerId)
+      const myHand = effectiveHand
+      const workingArea = effectiveWorkingArea
+      const melds = effectiveMelds
+
+      if (!myPlayer?.hasInitialMeld) return
 
       const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
@@ -205,12 +174,18 @@ export function GameBoard({
       onPlayTiles(updatedMelds, myHand, [...workingArea, tile])
       setSelectedWorkingTiles((prev) => new Set([...prev, tileId]))
     },
-    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles],
+    [effectiveGameState, effectiveHand, effectiveWorkingArea, effectiveMelds, playerId, onPlayTiles],
   )
 
   const breakMeld = useCallback(
     (meldId: string) => {
-      if (!canUseTableTiles) return
+      const gameState = effectiveGameState
+      const myPlayer = gameState?.players.find((p) => p.id === playerId)
+      const myHand = effectiveHand
+      const workingArea = effectiveWorkingArea
+      const melds = effectiveMelds
+
+      if (!myPlayer?.hasInitialMeld) return
 
       const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
@@ -220,12 +195,18 @@ export function GameBoard({
       onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
       setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
     },
-    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles],
+    [effectiveGameState, effectiveHand, effectiveWorkingArea, effectiveMelds, playerId, onPlayTiles],
   )
 
   const splitMeld = useCallback(
     (meldId: string) => {
-      if (!canUseTableTiles) return
+      const gameState = effectiveGameState
+      const myPlayer = gameState?.players.find((p) => p.id === playerId)
+      const myHand = effectiveHand
+      const workingArea = effectiveWorkingArea
+      const melds = effectiveMelds
+
+      if (!myPlayer?.hasInitialMeld) return
 
       const meld = melds.find((m) => m.id === meldId)
       if (!meld) return
@@ -243,11 +224,18 @@ export function GameBoard({
 
       onPlayTiles(updatedMelds, myHand, workingArea)
     },
-    [canUseTableTiles, melds, myHand, workingArea, onPlayTiles],
+    [effectiveGameState, effectiveHand, effectiveWorkingArea, effectiveMelds, playerId, onPlayTiles],
   )
 
   const returnSelectedToHand = useCallback(() => {
-    if (!myPlayer) return
+    const gameState = effectiveGameState
+    const myPlayer = gameState?.players.find((p) => p.id === playerId)
+    const myHand = effectiveHand
+    const workingArea = effectiveWorkingArea
+    const melds = effectiveMelds
+
+    if (!myPlayer || !gameState) return
+
     const tilesToReturn: Tile[] = []
     const tilesToKeep: Tile[] = []
 
@@ -266,7 +254,15 @@ export function GameBoard({
 
     onPlayTiles(melds, [...myHand, ...tilesToReturn], tilesToKeep)
     setSelectedWorkingTiles(new Set())
-  }, [workingArea, selectedWorkingTiles, gameState.turnStartHand, melds, myHand, onPlayTiles, myPlayer])
+  }, [
+    effectiveGameState,
+    effectiveHand,
+    effectiveWorkingArea,
+    effectiveMelds,
+    playerId,
+    selectedWorkingTiles,
+    onPlayTiles,
+  ])
 
   const clearSelection = useCallback(() => {
     setSelectedTiles(new Set())
@@ -288,6 +284,116 @@ export function GameBoard({
     setSelectedWorkingTiles(new Set())
   }, [onResetTurn])
 
+  const handleEndTurn = useCallback(async () => {
+    const gameState = effectiveGameState
+    const myPlayer = gameState?.players.find((p) => p.id === playerId)
+    const myHand = effectiveHand
+    const workingArea = effectiveWorkingArea
+    const melds = effectiveMelds
+
+    if (!myPlayer || !gameState) return
+
+    if (queueMode) {
+      console.log("[v0] Saving queued turn from game board")
+      await onQueueTurn()
+      return
+    }
+
+    const validation = canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!)
+    if (!validation.canEnd) {
+      return
+    }
+
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+    await onEndTurn()
+  }, [
+    effectiveGameState,
+    effectiveHand,
+    effectiveWorkingArea,
+    effectiveMelds,
+    playerId,
+    queueMode,
+    onQueueTurn,
+    onEndTurn,
+  ])
+
+  const handleDraw = useCallback(async () => {
+    const tile = await onDrawTile()
+    if (tile) {
+      setDrawnTile(tile)
+    }
+    setSelectedTiles(new Set())
+    setSelectedWorkingTiles(new Set())
+
+    if (!queueMode) {
+      await onEndTurn()
+    }
+  }, [queueMode, onDrawTile, onEndTurn])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedTiles(new Set())
+        setSelectedWorkingTiles(new Set())
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    const gameState = effectiveGameState
+    const currentPlayer = gameState?.players[gameState.currentPlayerIndex]
+    const isMyTurn = currentPlayer?.id === playerId || queueMode
+
+    if (!isMyTurn) {
+      setSelectedTiles(new Set())
+      setSelectedWorkingTiles(new Set())
+    }
+  }, [effectiveGameState, playerId, queueMode])
+
+  const gameState = effectiveGameState
+  const myPlayer = gameState?.players.find((p) => p.id === playerId)
+  const currentPlayer = gameState?.players[gameState.currentPlayerIndex]
+
+  if (!gameState || !myPlayer) {
+    return null
+  }
+
+  const myHand = effectiveHand
+  const workingArea = effectiveWorkingArea
+  const melds = effectiveMelds
+  const currentPlayerIndex = gameState.currentPlayerIndex
+  const isMyTurn = currentPlayer?.id === playerId || queueMode
+  const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
+  const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
+
+  const currentStyle = ROOM_STYLES[roomStyleId]
+
+  const allPlayersStarted = gameState.players.every((p) => p.hasInitialMeld)
+
+  const sortedTiles = myPlayer
+    ? [...myHand].sort((a, b) => {
+        if (a.isJoker && !b.isJoker) return 1
+        if (!a.isJoker && b.isJoker) return -1
+        if (a.color !== b.color) return a.color.localeCompare(b.color)
+        return a.number - b.number
+      })
+    : []
+
+  const sortedWorkingArea = [...workingArea].sort((a, b) => {
+    if (a.isJoker && !b.isJoker) return 1
+    if (!a.isJoker && b.isJoker) return -1
+    if (a.color !== b.color) return a.color.localeCompare(b.color)
+    return a.number - b.number
+  })
+
+  const allSelectedTiles = [
+    ...myHand.filter((t) => selectedTiles.has(t.id)),
+    ...workingArea.filter((t) => selectedWorkingTiles.has(t.id)),
+  ]
+
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
 
@@ -307,46 +413,7 @@ export function GameBoard({
     })
   })
 
-  const handleEndTurn = useCallback(async () => {
-    if (!myPlayer) return
-    if (queueMode) {
-      console.log("[v0] Saving queued turn from game board")
-      await onQueueTurn()
-      return
-    }
-
-    const validation = canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!)
-    if (!validation.canEnd) {
-      return
-    }
-
-    setSelectedTiles(new Set())
-    setSelectedWorkingTiles(new Set())
-    await onEndTurn()
-  }, [queueMode, onQueueTurn, myPlayer, melds, myHand, workingArea, gameState.rules, onEndTurn])
-
-  const handleDraw = useCallback(async () => {
-    const tile = await onDrawTile()
-    if (tile) {
-      setDrawnTile(tile)
-    }
-    setSelectedTiles(new Set())
-    setSelectedWorkingTiles(new Set())
-
-    if (!queueMode) {
-      await onEndTurn()
-    }
-  }, [queueMode, onDrawTile, onEndTurn])
-
   const canEnd = totalSelected === 0 || wouldBeValidMeld
-
-  if (!myPlayer) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-muted-foreground">Player not found in game</p>
-      </div>
-    )
-  }
 
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
@@ -586,7 +653,7 @@ export function GameBoard({
         </div>
       )}
 
-      {myPlayer && (
+      {isMyTurn && (
         <div className="border-t border-border/50 bg-card/50 backdrop-blur-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">

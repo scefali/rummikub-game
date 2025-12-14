@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { clearPlayerCookie } from "@/lib/cookies"
 import { showTurnNotification } from "@/lib/notifications"
 import { playTurnSound } from "@/lib/settings"
-import { QueueModeProvider, useQueueMode } from "@/lib/queue-mode-context"
+import { useQueueMode } from "@/lib/queue-mode-context"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { Loader2 } from "lucide-react"
 
@@ -22,30 +22,9 @@ interface GameClientProps {
 
 export function GameClient({ roomCode, playerId, playerName }: GameClientProps) {
   const [gameState, setGameState] = useState<GameState | null>(null)
-
-  return (
-    <QueueModeProvider gameState={gameState} playerId={playerId}>
-      <GameClientInner
-        roomCode={roomCode}
-        playerId={playerId}
-        playerName={playerName}
-        gameState={gameState}
-        setGameState={setGameState}
-      />
-    </QueueModeProvider>
-  )
-}
-
-interface GameClientInnerProps extends GameClientProps {
-  gameState: GameState | null
-  setGameState: (state: GameState | null) => void
-}
-
-function GameClientInner({ roomCode, playerId, playerName, gameState, setGameState }: GameClientInnerProps) {
+  const { queueMode, dispatchAction, enterQueueMode, exitQueueMode, getPendingChanges, hasQueuedTurn } = useQueueMode()
   const router = useRouter()
   const isMobile = useIsMobile()
-  const { queueMode, dispatchAction, enterQueueMode, exitQueueMode, getPendingChanges, hasQueuedTurn } = useQueueMode()
-
   const [roomStyleId, setRoomStyleId] = useState<RoomStyleId>("classic")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -332,7 +311,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   }, [roomCode, playerId, apiCall, router])
 
   // Loading state
-  if (isLoading || !gameState) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -342,16 +321,15 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   }
 
   // Determine current view
-  const currentPlayer = gameState.players.find((p) => p.id === playerId)
+  const currentPlayer = gameState?.players.find((p) => p.id === playerId)
   const isHost = currentPlayer?.isHost ?? false
 
   // In lobby
-  if (gameState.phase === "lobby") {
+  if (gameState?.phase === "lobby") {
     return (
       <LobbyScreen
         roomCode={roomCode}
         playerId={playerId}
-        gameState={gameState}
         roomStyleId={roomStyleId}
         isHost={isHost}
         onStartGame={startGame}
@@ -363,7 +341,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   }
 
   // Game ended
-  if (gameState.phase === "ended") {
+  if (gameState?.phase === "ended") {
     return (
       <GameEndScreen
         gameState={gameState}
@@ -380,7 +358,6 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   if (isMobile || !isHost) {
     return (
       <PlayerController
-        gameState={gameState}
         playerId={playerId}
         roomCode={roomCode}
         roomStyleId={roomStyleId}
@@ -399,7 +376,6 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 
   return (
     <GameBoard
-      gameState={gameState}
       playerId={playerId}
       roomCode={roomCode}
       roomStyleId={roomStyleId}
