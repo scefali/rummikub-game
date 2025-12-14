@@ -44,8 +44,7 @@ interface GameClientInnerProps extends GameClientProps {
 function GameClientInner({ roomCode, playerId, playerName, gameState, setGameState }: GameClientInnerProps) {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const { queueMode, enterQueueMode, exitQueueMode, updatePendingChanges, getPendingChanges, clearPendingChanges } =
-    useQueueMode()
+  const { queueMode, dispatchAction, enterQueueMode, exitQueueMode, getPendingChanges, hasQueuedTurn } = useQueueMode()
 
   const [roomStyleId, setRoomStyleId] = useState<RoomStyleId>("classic")
   const [error, setError] = useState<string | null>(null)
@@ -154,6 +153,12 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 
   const playTiles = useCallback(
     async (melds: Meld[], hand: Tile[], workingArea: Tile[] = []) => {
+      if (queueMode) {
+        console.log("[v0] Queueing tile play")
+        dispatchAction({ type: "updateState", melds, hand, workingArea })
+        return
+      }
+
       try {
         await apiCall({ action: "play_tiles", roomCode, playerId, melds, hand, workingArea })
         pollGameState()
@@ -161,14 +166,13 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
         setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to play tiles")
       }
     },
-    [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp],
+    [queueMode, dispatchAction, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp],
   )
 
   const drawTile = useCallback(async (): Promise<Tile | null> => {
     if (queueMode) {
-      console.error("[v0] CRITICAL ERROR: drawTile() called in queue mode!")
-      console.error("[v0] Stack trace:", new Error().stack)
-      console.error("[v0] This should never happen. Queue mode should handle draws locally in components.")
+      console.log("[v0] Queueing tile draw")
+      dispatchAction({ type: "drawTile" })
       return null
     }
 
@@ -180,25 +184,39 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to draw tile")
       return null
     }
-  }, [queueMode, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+  }, [queueMode, dispatchAction, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const endTurn = useCallback(async () => {
+    if (queueMode) {
+      console.log("[v0] Queueing turn end")
+      dispatchAction({ type: "endTurn" })
+      return
+    }
+
     try {
       await apiCall({ action: "end_turn", roomCode, playerId })
       pollGameState()
     } catch (err) {
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to end turn")
     }
-  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+  }, [queueMode, dispatchAction, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const resetTurn = useCallback(async () => {
+    if (queueMode) {
+      console.log("[v0] Resetting queue mode changes")
+      // Re-enter queue mode to reset to base state
+      exitQueueMode()
+      enterQueueMode()
+      return
+    }
+
     try {
       await apiCall({ action: "reset_turn", roomCode, playerId })
       pollGameState()
     } catch (err) {
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to reset turn")
     }
-  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+  }, [queueMode, enterQueueMode, exitQueueMode, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const endGame = useCallback(async () => {
     try {
@@ -259,23 +277,12 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
       })
       pollGameState()
       exitQueueMode()
-      clearPendingChanges()
-
       console.log("[v0] Turn queued successfully")
     } catch (err) {
       console.error("[v0] Queue turn failed:", err)
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to queue turn")
     }
-  }, [
-    roomCode,
-    playerId,
-    apiCall,
-    pollGameState,
-    exitQueueMode,
-    getPendingChanges,
-    clearPendingChanges,
-    setErrorWithTimestamp,
-  ])
+  }, [roomCode, playerId, apiCall, pollGameState, exitQueueMode, getPendingChanges, setErrorWithTimestamp])
 
   const clearQueuedTurn = useCallback(async () => {
     console.log("[v0] Clearing queued turn:", { roomCode, playerId: playerId.slice(0, 8) })
@@ -295,12 +302,17 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
       console.log("[v0] Toggling queue mode:", { enabled, roomCode, playerId: playerId.slice(0, 8) })
 
       if (enabled) {
+        if (hasQueuedTurn()) {
+          console.log("[v0] Player already has a queued turn")
+          // Don't enter queue mode, show the viewer instead
+          return
+        }
         enterQueueMode()
       } else {
         exitQueueMode()
       }
     },
-    [enterQueueMode, exitQueueMode, roomCode, playerId],
+    [hasQueuedTurn, enterQueueMode, exitQueueMode, roomCode, playerId],
   )
 
   const disconnect = useCallback(async () => {

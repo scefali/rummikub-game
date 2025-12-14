@@ -9,21 +9,25 @@ interface PendingQueuedChanges {
   workingArea: Tile[]
 }
 
+type GameAction =
+  | { type: "createMeld"; tiles: Tile[] }
+  | { type: "addToMeld"; meldId: string; tiles: Tile[] }
+  | { type: "breakMeld"; meldId: string }
+  | { type: "splitMeld"; meldId: string; splitIndex: number }
+  | { type: "drawTile" }
+  | { type: "updateState"; melds: Meld[]; hand: Tile[]; workingArea: Tile[] }
+
 interface QueueModeContextValue {
   queueMode: boolean
   effectiveGameState: GameState | null
   effectiveMelds: Meld[]
   effectiveHand: Tile[]
   effectiveWorkingArea: Tile[]
-  // Queue mode controls
+  dispatchAction: (action: GameAction) => void
   enterQueueMode: () => void
   exitQueueMode: () => void
-  // Update pending changes locally
-  updatePendingChanges: (changes: Partial<PendingQueuedChanges>) => void
-  // Get the pending changes to submit
   getPendingChanges: () => PendingQueuedChanges | null
-  // Clear everything
-  clearPendingChanges: () => void
+  hasQueuedTurn: () => boolean
 }
 
 const QueueModeContext = createContext<QueueModeContextValue | undefined>(undefined)
@@ -42,7 +46,6 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
   const effectiveGameState = useMemo((): GameState | null => {
     if (!gameState) return null
 
-    // In normal mode, just return the real game state
     if (!queueMode || !pendingChanges) {
       return gameState
     }
@@ -52,7 +55,6 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
         savedRevision: savedBaseRevision,
         currentRevision: gameState.revision,
       })
-      // Clear pending changes and exit queue mode
       setPendingChanges(null)
       setQueueMode(false)
       return gameState
@@ -63,10 +65,8 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
 
     return {
       ...gameState,
-      // Use pending melds instead of real melds
       melds: pendingChanges.melds,
       workingArea: [],
-      // Update my hand in players array
       players: gameState.players.map((p) =>
         p.id === playerId
           ? {
@@ -100,6 +100,49 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
     return pendingChanges.workingArea
   }, [queueMode, pendingChanges, gameState])
 
+  const dispatchAction = useCallback(
+    (action: GameAction) => {
+      if (!queueMode) {
+        console.error("[v0] dispatchAction called in normal mode - this is a bug")
+        return
+      }
+
+      console.log("[v0] Queue action dispatched:", action.type)
+
+      setPendingChanges((prev) => {
+        if (!prev) return null
+
+        switch (action.type) {
+          case "updateState":
+            return {
+              melds: action.melds,
+              hand: action.hand,
+              workingArea: action.workingArea,
+            }
+
+          case "drawTile":
+            return {
+              ...prev,
+              hand: [
+                ...prev.hand,
+                {
+                  id: `queued-draw-${Date.now()}`,
+                  number: 0,
+                  color: "black",
+                  isJoker: false,
+                },
+              ],
+            }
+
+          default:
+            console.warn("[v0] Unhandled action type:", action.type)
+            return prev
+        }
+      })
+    },
+    [queueMode],
+  )
+
   const enterQueueMode = useCallback(() => {
     console.log("[v0] Entering queue mode")
     if (!gameState) return
@@ -123,20 +166,15 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
     setSavedBaseRevision(0)
   }, [])
 
-  const updatePendingChanges = useCallback((changes: Partial<PendingQueuedChanges>) => {
-    setPendingChanges((prev) => {
-      if (!prev) return null
-      return { ...prev, ...changes }
-    })
-  }, [])
-
   const getPendingChanges = useCallback(() => {
     return pendingChanges
   }, [pendingChanges])
 
-  const clearPendingChanges = useCallback(() => {
-    setPendingChanges(null)
-  }, [])
+  const hasQueuedTurn = useCallback(() => {
+    if (!gameState) return false
+    const myPlayer = gameState.players.find((p) => p.id === playerId)
+    return !!myPlayer?.queuedTurn
+  }, [gameState, playerId])
 
   return (
     <QueueModeContext.Provider
@@ -146,11 +184,11 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
         effectiveMelds,
         effectiveHand,
         effectiveWorkingArea,
+        dispatchAction,
         enterQueueMode,
         exitQueueMode,
-        updatePendingChanges,
         getPendingChanges,
-        clearPendingChanges,
+        hasQueuedTurn,
       }}
     >
       {children}

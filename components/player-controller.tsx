@@ -71,15 +71,7 @@ export function PlayerController({
   error,
 }: PlayerControllerProps) {
   const { queueMode, effectiveMelds, effectiveHand, effectiveWorkingArea, updatePendingChanges } = useQueueMode()
-
-  const currentPlayerIndex = gameState.currentPlayerIndex
-  const currentPlayer = gameState.players[currentPlayerIndex]
-  const myPlayer = gameState.players.find((p) => p.id === playerId)!
-  const isMyTurn = currentPlayer?.id === playerId || queueMode
-  const myHand = effectiveHand
-  const workingArea = effectiveWorkingArea
-  const melds = effectiveMelds
-  const canUseTableTiles = myPlayer.hasInitialMeld
+  const isMyTurn = gameState.currentPlayerIndex === gameState.players.findIndex((p) => p.id === playerId)
 
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
@@ -91,9 +83,15 @@ export function PlayerController({
   const [showQueuedMoveViewer, setShowQueuedMoveViewer] = useState(false)
   const [hasPlayed, setHasPlayed] = useState(false)
 
+  const currentPlayerIndex = gameState.currentPlayerIndex
+  const currentPlayer = gameState.players[currentPlayerIndex]
+  const myPlayer = gameState.players.find((p) => p.id === playerId)
   const currentStyle = ROOM_STYLES[roomStyleId]
-
   const allPlayersStarted = gameState.players.every((p) => p.hasInitialMeld)
+  const myHand = effectiveHand
+  const workingArea = effectiveWorkingArea
+  const melds = effectiveMelds
+  const canUseTableTiles = myPlayer.hasInitialMeld
 
   const sortedHand = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
@@ -472,6 +470,14 @@ export function PlayerController({
 
   const canEnd =
     isMyTurn && myPlayer.hasInitialMeld && canEndTurn(myPlayer, melds, myHand, workingArea, gameState.rules!).canEnd
+
+  if (!myPlayer) {
+    return (
+      <div className="flex items-center justify-center p-4">
+        <p className="text-muted-foreground text-sm">Player not found in game</p>
+      </div>
+    )
+  }
 
   return (
     <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
