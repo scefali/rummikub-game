@@ -11,6 +11,7 @@ import { clearPlayerCookie } from "@/lib/cookies"
 import { showTurnNotification } from "@/lib/notifications"
 import { playTurnSound } from "@/lib/settings"
 import { useQueueMode } from "@/lib/queue-mode-context"
+import { QueueModeProvider } from "@/lib/queue-mode-context"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { Loader2 } from "lucide-react"
 
@@ -20,8 +21,12 @@ interface GameClientProps {
   playerName: string
 }
 
-export function GameClient({ roomCode, playerId, playerName }: GameClientProps) {
-  const [gameState, setGameState] = useState<GameState | null>(null)
+interface GameClientInnerProps extends GameClientProps {
+  gameState: GameState | null
+  setGameState: (state: GameState | null) => void
+}
+
+function GameClientInner({ roomCode, playerId, playerName, gameState, setGameState }: GameClientInnerProps) {
   const { queueMode, dispatchAction, enterQueueMode, exitQueueMode, getPendingChanges, hasQueuedTurn } = useQueueMode()
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -393,3 +398,21 @@ export function GameClient({ roomCode, playerId, playerName }: GameClientProps) 
     />
   )
 }
+
+function GameClientWithProvider({ roomCode, playerId, playerName }: GameClientProps) {
+  const [gameState, setGameState] = useState<GameState | null>(null)
+
+  return (
+    <QueueModeProvider gameState={gameState} playerId={playerId}>
+      <GameClientInner
+        roomCode={roomCode}
+        playerId={playerId}
+        playerName={playerName}
+        gameState={gameState}
+        setGameState={setGameState}
+      />
+    </QueueModeProvider>
+  )
+}
+
+export { GameClientWithProvider as GameClient }

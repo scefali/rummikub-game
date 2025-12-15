@@ -6,7 +6,6 @@ import { GameClient } from "./game-client"
 import { PlayerConfirmModal } from "@/components/player-confirm-modal"
 import { setPlayerCookie } from "@/lib/cookies"
 import { Loader2 } from "lucide-react"
-import { QueueModeProvider } from "@/lib/queue-mode-context"
 
 interface GamePageClientProps {
   roomCode: string
@@ -66,9 +65,7 @@ export function GamePageClient({ roomCode, pendingLogin }: GamePageClientProps) 
   // If confirmed, show the game
   if (confirmedPlayer) {
     return (
-      <QueueModeProvider>
-        <GameClient roomCode={roomCode} playerId={confirmedPlayer.playerId} playerName={confirmedPlayer.playerName} />
-      </QueueModeProvider>
+      <GameClient roomCode={roomCode} playerId={confirmedPlayer.playerId} playerName={confirmedPlayer.playerName} />
     )
   }
 
