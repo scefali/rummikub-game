@@ -599,7 +599,7 @@ export async function queueTurn(
 ): Promise<{ success: boolean; error?: string }> {
   console.log("[v0] Queue turn request:", {
     roomCode,
-    playerId: playerId.slice(0, 8),
+    playerId: playerId ? playerId.slice(0, 8) : "undefined",
     meldsCount: plannedMelds.length,
     handSize: plannedHand.length,
     workingAreaSize: plannedWorkingArea.length,

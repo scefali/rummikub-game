@@ -41,7 +41,7 @@ interface QueueModeProviderProps {
 export function QueueModeProvider({ children, gameState, playerId }: QueueModeProviderProps) {
   console.log("[v0] QueueModeProvider: rendering", {
     gameState: gameState ? `exists (revision ${gameState.revision})` : "null",
-    playerId: playerId.slice(0, 8),
+    playerId: playerId ? playerId.slice(0, 8) : "undefined",
   })
 
   const [queueMode, setQueueMode] = useState(false)

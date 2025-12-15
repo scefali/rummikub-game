@@ -28,12 +28,20 @@ export async function POST(request: NextRequest) {
       plannedWorkingArea,
     } = body
 
-    console.log("[v0] API Request:", { action, roomCode, playerName, playerId: playerId?.slice(0, 8) })
+    console.log("[v0] API Request:", {
+      action,
+      roomCode,
+      playerName,
+      playerId: playerId ? playerId.slice(0, 8) : "undefined",
+    })
 
     switch (action) {
       case "create_room": {
         const result = await gameStore.createRoom(playerName, playerEmail)
-        console.log("[v0] Room created:", { roomCode: result.roomCode, playerId: result.playerId?.slice(0, 8) })
+        console.log("[v0] Room created:", {
+          roomCode: result.roomCode,
+          playerId: result.playerId ? result.playerId.slice(0, 8) : "undefined",
+        })
         return NextResponse.json({
           roomCode: result.roomCode,
           playerId: result.playerId,

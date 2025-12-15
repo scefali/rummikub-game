@@ -244,7 +244,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 
     console.log("[v0] Queueing turn:", {
       roomCode,
-      playerId: playerId.slice(0, 8),
+      playerId: playerId ? playerId.slice(0, 8) : "undefined",
       meldsCount: pending.melds.length,
       handSize: pending.hand.length,
       workingAreaSize: pending.workingArea.length,
@@ -269,7 +269,10 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   }, [roomCode, playerId, apiCall, pollGameState, exitQueueMode, getPendingChanges, setErrorWithTimestamp])
 
   const clearQueuedTurn = useCallback(async () => {
-    console.log("[v0] Clearing queued turn:", { roomCode, playerId: playerId.slice(0, 8) })
+    console.log("[v0] Clearing queued turn:", {
+      roomCode,
+      playerId: playerId ? playerId.slice(0, 8) : "undefined",
+    })
 
     try {
       await apiCall({ action: "clear_queued_turn", roomCode, playerId })
@@ -283,7 +286,11 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 
   const handleToggleQueueMode = useCallback(
     (enabled: boolean) => {
-      console.log("[v0] Toggling queue mode:", { enabled, roomCode, playerId: playerId.slice(0, 8) })
+      console.log("[v0] Toggling queue mode:", {
+        enabled,
+        roomCode,
+        playerId: playerId ? playerId.slice(0, 8) : "undefined",
+      })
 
       if (enabled) {
         if (hasQueuedTurn()) {
@@ -400,7 +407,11 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 }
 
 function GameClientWithProvider({ roomCode, playerId, playerName }: GameClientProps) {
-  console.log("[v0] GameClientWithProvider: rendering", { roomCode, playerId: playerId.slice(0, 8), playerName })
+  console.log("[v0] GameClientWithProvider: rendering", {
+    roomCode,
+    playerId: playerId ? playerId.slice(0, 8) : "undefined",
+    playerName,
+  })
   const [gameState, setGameState] = useState<GameState | null>(null)
 
   console.log("[v0] GameClientWithProvider: gameState =", gameState ? "exists" : "null")
