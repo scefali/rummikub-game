@@ -6,17 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    instrumentationHook: true,
-  },
+  turbopack: {},
   productionBrowserSourceMaps: true,
-  webpack: (config, { isServer }) => {
-    // Generate source maps for both client and server
-    if (!isServer) {
-      config.devtool = 'source-map'
-    }
-    return config
-  },
 }
 
 export default nextConfig
