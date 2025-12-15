@@ -400,7 +400,10 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 }
 
 function GameClientWithProvider({ roomCode, playerId, playerName }: GameClientProps) {
+  console.log("[v0] GameClientWithProvider: rendering", { roomCode, playerId: playerId.slice(0, 8), playerName })
   const [gameState, setGameState] = useState<GameState | null>(null)
+
+  console.log("[v0] GameClientWithProvider: gameState =", gameState ? "exists" : "null")
 
   return (
     <QueueModeProvider gameState={gameState} playerId={playerId}>

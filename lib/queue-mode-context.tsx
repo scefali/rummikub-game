@@ -39,14 +39,23 @@ interface QueueModeProviderProps {
 }
 
 export function QueueModeProvider({ children, gameState, playerId }: QueueModeProviderProps) {
+  console.log("[v0] QueueModeProvider: rendering", {
+    gameState: gameState ? `exists (revision ${gameState.revision})` : "null",
+    playerId: playerId.slice(0, 8),
+  })
+
   const [queueMode, setQueueMode] = useState(false)
   const [pendingChanges, setPendingChanges] = useState<PendingQueuedChanges | null>(null)
   const [savedBaseRevision, setSavedBaseRevision] = useState<number>(0)
 
   const effectiveGameState = useMemo((): GameState | null => {
-    if (!gameState) return null
+    if (!gameState) {
+      console.log("[v0] QueueModeProvider: gameState is null, returning null")
+      return null
+    }
 
     if (!queueMode || !pendingChanges) {
+      console.log("[v0] QueueModeProvider: not in queue mode, returning base gameState")
       return gameState
     }
 
@@ -61,8 +70,12 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
     }
 
     const myPlayer = gameState.players.find((p) => p.id === playerId)
-    if (!myPlayer) return gameState
+    if (!myPlayer) {
+      console.log("[v0] QueueModeProvider: myPlayer not found in gameState")
+      return gameState
+    }
 
+    console.log("[v0] QueueModeProvider: returning effective gameState with pending changes")
     return {
       ...gameState,
       melds: pendingChanges.melds,
@@ -145,11 +158,18 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
 
   const enterQueueMode = useCallback(() => {
     console.log("[v0] Entering queue mode")
-    if (!gameState) return
+    if (!gameState) {
+      console.log("[v0] Cannot enter queue mode: gameState is null")
+      return
+    }
 
     const myPlayer = gameState.players.find((p) => p.id === playerId)
-    if (!myPlayer) return
+    if (!myPlayer) {
+      console.log("[v0] Cannot enter queue mode: myPlayer not found")
+      return
+    }
 
+    console.log("[v0] Queue mode entered successfully, revision:", gameState.revision)
     setPendingChanges({
       melds: JSON.parse(JSON.stringify(gameState.melds)),
       hand: JSON.parse(JSON.stringify(myPlayer.hand)),
@@ -176,6 +196,13 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
     return !!myPlayer?.queuedTurn
   }, [gameState, playerId])
 
+  console.log("[v0] QueueModeProvider: providing context", {
+    queueMode,
+    effectiveGameState: effectiveGameState ? "exists" : "null",
+    effectiveMeldsCount: effectiveMelds.length,
+    effectiveHandCount: effectiveHand.length,
+  })
+
   return (
     <QueueModeContext.Provider
       value={{
@@ -199,6 +226,7 @@ export function QueueModeProvider({ children, gameState, playerId }: QueueModePr
 export function useQueueMode() {
   const context = useContext(QueueModeContext)
   if (context === undefined) {
+    console.error("[v0] useQueueMode called outside QueueModeProvider")
     throw new Error("useQueueMode must be used within a QueueModeProvider")
   }
   return context
