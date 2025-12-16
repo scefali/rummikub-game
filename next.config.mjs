@@ -6,8 +6,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  turbopack: {},
-  productionBrowserSourceMaps: true,
+ 
 }
 
 export default nextConfig

@@ -5,72 +5,67 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import {
+  Hand,
   Layers,
   Plus,
   X,
   Download,
+  Send,
   AlertCircle,
+  Users,
   Wrench,
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  LogOut,
   Settings,
-  Clock,
-  CheckCircle,
 } from "lucide-react"
-import type { Meld, Tile, RoomStyleId } from "@/lib/game-types"
+import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { ROOM_STYLES } from "@/lib/game-types"
 import { GameTile } from "@/components/game-tile"
 import { MeldDisplay } from "@/components/meld-display"
 import { DrawnTileModal } from "@/components/drawn-tile-modal"
 import { EndGameModal } from "@/components/end-game-modal"
 import { SettingsModal } from "@/components/settings-modal"
-import { QueuedMoveViewer } from "@/components/queued-move-viewer"
-import { useQueueMode } from "@/lib/queue-mode-context"
 import {
   generateId,
   isValidMeld,
   calculateProcessedMeldPoints,
   processMeld,
   findValidSplitPoint,
-  calculateHandPoints,
-  canEndTurn,
+  calculateHandPoints, // Import calculateHandPoints
 } from "@/lib/game-logic"
 import { cn } from "@/lib/utils"
 
 interface PlayerControllerProps {
+  gameState: GameState
   playerId: string
   roomCode: string
   roomStyleId: RoomStyleId
+  isHost: boolean
   onPlayTiles: (melds: Meld[], hand: Tile[], workingArea: Tile[]) => void
   onDrawTile: () => Promise<Tile | null>
   onEndTurn: () => void
   onResetTurn: () => void
   onEndGame: () => void
-  onQueueTurn: () => Promise<void>
-  onClearQueuedTurn: () => Promise<void>
-  onToggleQueueMode: (enabled: boolean) => void
-  error: string | null
+  onChangeRoomStyle: (styleId: RoomStyleId) => void
+  error?: string | null
 }
 
 export function PlayerController({
+  gameState,
   playerId,
   roomCode,
   roomStyleId,
+  isHost,
   onPlayTiles,
   onDrawTile,
   onEndTurn,
   onResetTurn,
   onEndGame,
-  onQueueTurn,
-  onClearQueuedTurn,
-  onToggleQueueMode,
+  onChangeRoomStyle,
   error,
 }: PlayerControllerProps) {
-  const { queueMode, effectiveGameState, effectiveMelds, effectiveHand, effectiveWorkingArea } = useQueueMode()
-  const gameState = effectiveGameState
-  const isMyTurn = gameState?.currentPlayerIndex === gameState?.players.findIndex((p) => p.id === playerId)
-
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set())
   const [selectedWorkingTiles, setSelectedWorkingTiles] = useState<Set<string>>(new Set())
   const [showPlayers, setShowPlayers] = useState(false)
@@ -78,18 +73,18 @@ export function PlayerController({
   const [handExpanded, setHandExpanded] = useState(true)
   const [showEndGameModal, setShowEndGameModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [showQueuedMoveViewer, setShowQueuedMoveViewer] = useState(false)
-  const [hasPlayed, setHasPlayed] = useState(false)
 
-  const currentPlayerIndex = gameState?.currentPlayerIndex
-  const currentPlayer = gameState?.players[currentPlayerIndex]
-  const myPlayer = gameState?.players.find((p) => p.id === playerId)
-  const currentStyle = ROOM_STYLES[roomStyleId]
-  const allPlayersStarted = gameState?.players.every((p) => p.hasInitialMeld)
-  const myHand = effectiveHand
-  const workingArea = effectiveWorkingArea
-  const melds = effectiveMelds
+  const currentPlayer = gameState.players[gameState.currentPlayerIndex]
+  const myPlayer = gameState.players.find((p) => p.id === playerId)
+  const isMyTurn = currentPlayer?.id === playerId
+  const myHand = myPlayer?.hand || []
+  const workingArea = gameState.workingArea || []
   const canUseTableTiles = myPlayer?.hasInitialMeld ?? false
+  const myPlayerCode = myPlayer?.playerCode
+
+  const currentStyle = ROOM_STYLES[roomStyleId]
+
+  const allPlayersStarted = gameState.players.every((p) => p.hasInitialMeld)
 
   const sortedHand = [...myHand].sort((a, b) => {
     if (a.isJoker && !b.isJoker) return 1
@@ -145,11 +140,11 @@ export function PlayerController({
       tiles: allSelectedTiles,
     }
 
-    const newMelds = [...melds, newMeld]
+    const newMelds = [...gameState.melds, newMeld]
     onPlayTiles(newMelds, remainingHand, remainingWorking)
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles])
+  }, [myHand, workingArea, selectedTiles, selectedWorkingTiles, gameState.melds, onPlayTiles])
 
   const addToMeld = useCallback(
     (meldId: string) => {
@@ -158,7 +153,7 @@ export function PlayerController({
       const remainingHand = myHand.filter((t) => !selectedTiles.has(t.id))
       const remainingWorking = workingArea.filter((t) => !selectedWorkingTiles.has(t.id))
 
-      const updatedMelds = melds.map((m) => {
+      const updatedMelds = gameState.melds.map((m) => {
         if (m.id === meldId) {
           return { ...m, tiles: [...m.tiles, ...allSelectedTiles] }
         }
@@ -169,20 +164,20 @@ export function PlayerController({
       setSelectedTiles(new Set())
       setSelectedWorkingTiles(new Set())
     },
-    [myHand, workingArea, selectedTiles, selectedWorkingTiles, melds, onPlayTiles],
+    [myHand, workingArea, selectedTiles, selectedWorkingTiles, gameState.melds, onPlayTiles],
   )
 
   const takeTileFromMeld = useCallback(
     (tileId: string, meldId: string) => {
-      if (!myPlayer?.hasInitialMeld) return
+      if (!canUseTableTiles) return
 
-      const meld = melds.find((m) => m.id === meldId)
+      const meld = gameState.melds.find((m) => m.id === meldId)
       if (!meld) return
 
       const tile = meld.tiles.find((t) => t.id === tileId)
       if (!tile) return
 
-      const updatedMelds = melds
+      const updatedMelds = gameState.melds
         .map((m) => {
           if (m.id === meldId) {
             return { ...m, tiles: m.tiles.filter((t) => t.id !== tileId) }
@@ -191,14 +186,11 @@ export function PlayerController({
         })
         .filter((m) => m.tiles.length > 0)
 
-      onPlayTiles(
-        updatedMelds,
-        [...myHand, tile],
-        workingArea.filter((t) => t.id !== tileId),
-      )
+      onPlayTiles(updatedMelds, myHand, [...workingArea, tile])
+
       setSelectedWorkingTiles((prev) => new Set([...prev, tileId]))
     },
-    [myPlayer?.hasInitialMeld, melds, myHand, workingArea, onPlayTiles],
+    [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
 
   const returnSelectedToHand = useCallback(() => {
@@ -207,7 +199,7 @@ export function PlayerController({
 
     workingArea.forEach((tile) => {
       if (selectedWorkingTiles.has(tile.id)) {
-        const wasFromHand = gameState?.turnStartHand.some((t) => t.id === tile.id)
+        const wasFromHand = gameState.turnStartHand.some((t) => t.id === tile.id)
         if (wasFromHand) {
           tilesToReturn.push(tile)
         } else {
@@ -218,46 +210,47 @@ export function PlayerController({
       }
     })
 
-    onPlayTiles(melds, [...myHand, ...tilesToReturn], tilesToKeep)
+    onPlayTiles(gameState.melds, [...myHand, ...tilesToReturn], tilesToKeep)
     setSelectedWorkingTiles(new Set())
-  }, [workingArea, selectedWorkingTiles, gameState?.turnStartHand, melds, myHand, onPlayTiles])
+  }, [workingArea, selectedWorkingTiles, gameState.turnStartHand, gameState.melds, myHand, onPlayTiles])
 
   const breakMeld = useCallback(
     (meldId: string) => {
-      if (!myPlayer?.hasInitialMeld) return
+      if (!canUseTableTiles) return
 
-      const meld = melds.find((m) => m.id === meldId)
+      const meld = gameState.melds.find((m) => m.id === meldId)
       if (!meld) return
 
-      const updatedMelds = melds.filter((m) => m.id !== meldId)
+      const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
+      onPlayTiles(updatedMelds, myHand, [...workingArea, ...meld.tiles])
 
-      onPlayTiles(updatedMelds, [...myHand, ...meld.tiles], workingArea)
       setSelectedWorkingTiles((prev) => new Set([...prev, ...meld.tiles.map((t) => t.id)]))
     },
-    [myPlayer?.hasInitialMeld, melds, myHand, workingArea, onPlayTiles],
+    [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
 
   const splitMeld = useCallback(
     (meldId: string) => {
-      if (!myPlayer?.hasInitialMeld) return
+      if (!canUseTableTiles) return
 
-      const meld = melds.find((m) => m.id === meldId)
+      const meld = gameState.melds.find((m) => m.id === meldId)
       if (!meld) return
 
       const splitPoint = findValidSplitPoint(meld)
       if (splitPoint === null) return
 
+      // Process to get correct tile order
       const processed = processMeld(meld)
       const firstPart = processed.tiles.slice(0, splitPoint)
       const secondPart = processed.tiles.slice(splitPoint)
 
-      const updatedMelds = melds.filter((m) => m.id !== meldId)
+      const updatedMelds = gameState.melds.filter((m) => m.id !== meldId)
       updatedMelds.push({ id: generateId(), tiles: firstPart })
       updatedMelds.push({ id: generateId(), tiles: secondPart })
 
       onPlayTiles(updatedMelds, myHand, workingArea)
     },
-    [myPlayer?.hasInitialMeld, melds, myHand, workingArea, onPlayTiles],
+    [canUseTableTiles, gameState.melds, myHand, workingArea, onPlayTiles],
   )
 
   const clearSelection = useCallback(() => {
@@ -266,69 +259,39 @@ export function PlayerController({
   }, [])
 
   const handleDrawTile = useCallback(async () => {
-    if (queueMode) {
-      // In queue mode, simulate drawing a tile locally without calling API
-      console.log("[v0] Queue mode: Simulating draw tile (no API call)")
-      const simulatedTile: Tile = {
-        id: `queued-draw-${Date.now()}-${Math.random()}`,
-        number: 0, // Placeholder
-        color: "black",
-        isJoker: false,
-      }
-
-      onPlayTiles(melds, [...myHand, simulatedTile], workingArea)
-
-      setDrawnTile(simulatedTile)
-      setSelectedTiles(new Set())
-      setSelectedWorkingTiles(new Set())
-      return
-    }
-
-    // Normal mode: actually draw from API
     const tile = await onDrawTile()
     if (tile) {
       setDrawnTile(tile)
     }
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [queueMode, myHand, melds, workingArea, onPlayTiles, onDrawTile])
+  }, [onDrawTile])
 
   const handleResetTurn = useCallback(() => {
-    if (queueMode) {
-      const myPlayer = gameState?.players.find((p) => p.id === playerId)
-      if (myPlayer) {
-        onPlayTiles(
-          JSON.parse(JSON.stringify(gameState?.melds)),
-          JSON.parse(JSON.stringify(myPlayer.hand)),
-          JSON.parse(JSON.stringify(gameState?.workingArea)),
-        )
-      }
-    } else {
-      onResetTurn()
-    }
+    onResetTurn()
     setSelectedTiles(new Set())
     setSelectedWorkingTiles(new Set())
-  }, [queueMode, gameState, playerId, onResetTurn, onPlayTiles])
+  }, [onResetTurn])
 
   const wouldBeValidMeld = allSelectedTiles.length >= 3 && isValidMeld({ id: "temp", tiles: allSelectedTiles })
 
-  const totalNewPoints = melds
+  const totalNewPoints = gameState.melds
     .filter((m) => isValidMeld(m))
     .reduce((sum, m) => sum + calculateProcessedMeldPoints(processMeld(m)), 0)
 
   const totalSelected = selectedTiles.size + selectedWorkingTiles.size
 
-  const initialMeldThreshold = gameState?.rules?.initialMeldThreshold ?? 30
+  const initialMeldThreshold = gameState.rules?.initialMeldThreshold ?? 30
 
   const hasChangesToReset =
     workingArea.length > 0 ||
-    myHand.length !== gameState?.turnStartHand.length ||
-    !myHand.every((t) => gameState?.turnStartHand.some((st) => st.id === t.id))
+    myHand.length !== gameState.turnStartHand.length ||
+    !myHand.every((t) => gameState.turnStartHand.some((st) => st.id === t.id))
 
   const lastSeenTileIds = new Set(myPlayer?.lastSeenMeldTileIds || [])
 
   const newTileIds = new Set<string>()
-  melds.forEach((meld) => {
+  gameState.melds.forEach((meld) => {
     meld.tiles.forEach((tile) => {
       if (!lastSeenTileIds.has(tile.id)) {
         newTileIds.add(tile.id)
@@ -344,165 +307,73 @@ export function PlayerController({
   }, [isMyTurn])
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {}
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!isMyTurn) {
       clearSelection()
     }
   }, [isMyTurn, clearSelection])
 
-  const handleEndTurn = useCallback(async () => {
-    if (queueMode) {
-      console.log("[v0] Saving queued turn from player controller")
-      await onQueueTurn()
-      return
-    }
-
-    const validation = canEndTurn(myPlayer, melds, myHand, workingArea, gameState?.rules!)
-    if (!validation.canEnd) {
-      return
-    }
-
-    setSelectedTiles(new Set())
-    setSelectedWorkingTiles(new Set())
-    await onEndTurn()
-    setHasPlayed(true)
-  }, [queueMode, onQueueTurn, myPlayer, melds, myHand, workingArea, gameState?.rules, onEndTurn])
-
-  const handleTileToBoard = useCallback(
-    (tileIds: string[]) => {
-      if (queueMode) {
-        const tiles = tileIds.map((id) => myHand.find((t) => t.id === id)!).filter(Boolean)
-        const newWorkingArea = [...workingArea, ...tiles]
-        const newHand = myHand.filter((t) => !tileIds.includes(t.id))
-
-        onPlayTiles(melds, newHand, newWorkingArea)
-      } else {
-        const tiles = tileIds.map((id) => myHand.find((t) => t.id === id)!).filter(Boolean)
-        const newWorkingArea = [...workingArea, ...tiles]
-        const newHand = myHand.filter((t) => !tileIds.includes(t.id))
-        onPlayTiles(melds, newHand, newWorkingArea)
-      }
-      setSelectedTiles(new Set())
-    },
-    [queueMode, myHand, workingArea, melds, onPlayTiles],
-  )
-
-  const handleTileToHand = useCallback(
-    (tileIds: string[]) => {
-      if (queueMode) {
-        const tiles = tileIds.map((id) => workingArea.find((t) => t.id === id)!).filter(Boolean)
-        const newHand = [...myHand, ...tiles]
-        const newWorkingArea = workingArea.filter((t) => !tileIds.includes(t.id))
-
-        onPlayTiles(melds, newHand, newWorkingArea)
-      } else {
-        const tiles = tileIds.map((id) => workingArea.find((t) => t.id === id)!).filter(Boolean)
-        const newHand = [...myHand, ...tiles]
-        const newWorkingArea = workingArea.filter((t) => !tileIds.includes(t.id))
-        onPlayTiles(melds, newHand, newWorkingArea)
-      }
-      setSelectedWorkingTiles(new Set())
-    },
-    [queueMode, myHand, workingArea, melds, onPlayTiles],
-  )
-
-  const handleDrawAndPass = useCallback(async () => {
-    if (queueMode && onPlayTiles) {
-      // Queue mode: Just simulate the draw action locally, don't submit queue yet
-      console.log("[v0] Queue mode: Simulating draw tile locally")
-      const simulatedTile: Tile = {
-        id: `queued-draw-${Date.now()}-${Math.random()}`,
-        number: 0, // Placeholder - will be replaced with real tile when auto-played
-        color: "black",
-        isJoker: false,
-      }
-
-      onPlayTiles(melds, [...myHand, simulatedTile], workingArea)
-
-      setDrawnTile(simulatedTile)
-      console.log("[v0] Simulated tile added to queued hand. User must click 'Queue Move' to save.")
-      return
-    }
-
-    // Normal mode: Draw from API and end turn
-    console.log("[v0] Normal mode: Drawing tile from API and ending turn")
-    const tile = await onDrawTile()
-    if (tile) {
-      setDrawnTile(tile)
-    }
-    setSelectedTiles(new Set())
-    setSelectedWorkingTiles(new Set())
-    await onEndTurn()
-    setHasPlayed(true)
-  }, [queueMode, myHand, melds, workingArea, onPlayTiles, onDrawTile, onEndTurn])
-
-  const canEnd =
-    isMyTurn && myPlayer?.hasInitialMeld && canEndTurn(myPlayer, melds, myHand, workingArea, gameState?.rules!).canEnd
-
-  if (!gameState || !myPlayer) {
-    return null
-  }
-
   return (
-    <div className={cn("min-h-screen flex flex-col", currentStyle.background)}>
-      {queueMode && (
-        <div className="bg-yellow-500/90 text-black px-3 py-2 text-center text-sm font-semibold flex items-center justify-center gap-2">
-          <Clock className="w-3 h-3" />
-          Queue Mode - Planning your next turn
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onToggleQueueMode(false)}
-            className="ml-2 h-5 text-xs bg-black/20 hover:bg-black/30 px-2"
-          >
-            Exit
-          </Button>
-        </div>
-      )}
+    <div className={cn("h-dvh flex flex-col overflow-hidden", currentStyle.background)}>
+      <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
+      <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        roomStyleId={roomStyleId}
+        onStyleChange={onChangeRoomStyle}
+        isHost={isHost}
+      />
 
-      <div className="bg-card/95 backdrop-blur border-b px-3 py-2 flex items-center justify-between">
+      <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold text-foreground">Rummikub</h1>
           <Badge variant="secondary" className="font-mono text-xs">
             {roomCode}
           </Badge>
         </div>
-        <div className="flex items-center gap-1.5">
-          {!isMyTurn && !queueMode && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (myPlayer?.queuedTurn) {
-                  setShowQueuedMoveViewer(true)
-                } else {
-                  onToggleQueueMode(true)
-                }
-              }}
-              className="h-7 px-2 relative"
-            >
-              <Clock className="w-3 h-3 mr-1" />
-              Queue
-              {myPlayer?.queuedTurn && (
-                <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px] leading-tight">
-                  ✓
-                </Badge>
-              )}
-            </Button>
-          )}
-
-          {myPlayer?.queuedTurn && (
-            <Button variant="ghost" size="sm" onClick={onClearQueuedTurn} className="h-7 px-2">
-              <X className="w-3 h-3" />
-            </Button>
-          )}
-
-          <Button variant="ghost" size="icon" onClick={() => setShowSettingsModal(true)} className="h-7 w-7">
-            <Settings className="w-3 h-3" />
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowSettingsModal(true)}>
+            <Settings className="w-4 h-4" />
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setShowEndGameModal(true)}
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1 h-8 px-2" onClick={() => setShowPlayers(!showPlayers)}>
+            <Users className="w-4 h-4" />
+            {gameState.players.length}
+          </Button>
+          <span className="flex items-center gap-1">
+            <Layers className="w-4 h-4" />
+            {gameState.tilePool.length}
+          </span>
+          <span className="flex items-center gap-1">
+            <Hand className="w-4 h-4" />
+            {myHand.length}
+          </span>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-shrink-0 py-2 px-4 text-center text-sm font-medium transition-colors">
+      <div
+        className={cn(
+          "flex-shrink-0 py-2 px-4 text-center text-sm font-medium transition-colors",
+          isMyTurn ? "bg-primary/20 text-primary" : "bg-secondary/20 text-muted-foreground",
+        )}
+      >
         {isMyTurn ? (
           <span className="flex items-center justify-center gap-2">
             <span className="relative flex h-2 w-2">
@@ -528,12 +399,12 @@ export function PlayerController({
       {showPlayers && (
         <div className="flex-shrink-0 p-3 bg-card/50 backdrop-blur-sm border-b border-border/50 max-h-40 overflow-auto">
           <div className="flex flex-wrap gap-2">
-            {gameState?.players.map((player, index) => (
+            {gameState.players.map((player, index) => (
               <div
                 key={player.id}
                 className={cn(
                   "px-3 py-1.5 rounded-full text-xs flex items-center gap-2",
-                  index === gameState?.currentPlayerIndex
+                  index === gameState.currentPlayerIndex
                     ? "bg-primary/20 text-primary border border-primary/30"
                     : "bg-secondary/30 text-muted-foreground",
                   player.id === playerId && "ring-1 ring-primary/50",
@@ -555,34 +426,34 @@ export function PlayerController({
           <div className="flex items-center gap-2 mb-2">
             <Layers className="w-4 h-4 text-muted-foreground" />
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Table ({melds.length})
+              Table ({gameState.melds.length})
             </h3>
-            {!myPlayer?.hasInitialMeld && isMyTurn && (
+            {!canUseTableTiles && isMyTurn && (
               <Badge variant="outline" className="text-xs">
                 First turn: hand only
               </Badge>
             )}
           </div>
 
-          {melds.length === 0 ? (
+          {gameState.melds.length === 0 ? (
             <Card className="p-4 border-dashed border-2 bg-transparent">
               <p className="text-muted-foreground text-center text-xs">No melds yet - select tiles to create one</p>
             </Card>
           ) : (
             <div className="flex flex-wrap gap-1.5">
-              {melds.map((meld) => (
+              {gameState.melds.map((meld) => (
                 <MeldDisplay
                   key={meld.id}
                   meld={meld}
-                  isInteractive={isMyTurn && (myPlayer?.hasInitialMeld ?? false)}
+                  isInteractive={isMyTurn && canUseTableTiles}
                   hasSelectedTiles={totalSelected > 0}
-                  onTileClick={isMyTurn && myPlayer?.hasInitialMeld ? takeTileFromMeld : undefined}
+                  onTileClick={isMyTurn && canUseTableTiles ? takeTileFromMeld : undefined}
                   onAddTile={isMyTurn ? addToMeld : undefined}
-                  onDeleteMeld={isMyTurn && myPlayer?.hasInitialMeld ? breakMeld : undefined}
-                  onSplitMeld={isMyTurn && myPlayer?.hasInitialMeld ? splitMeld : undefined}
+                  onDeleteMeld={isMyTurn && canUseTableTiles ? breakMeld : undefined}
+                  onSplitMeld={isMyTurn && canUseTableTiles ? splitMeld : undefined}
                   compact
                   newTileIds={newTileIds}
-                  hidePoints={allPlayersStarted}
+                  hidePoints={allPlayersStarted} // Hide points when all players have started
                 />
               ))}
             </div>
@@ -607,7 +478,7 @@ export function PlayerController({
               <div className="overflow-x-auto pb-1 -mx-1 px-1">
                 <div className="flex gap-1.5 min-w-max">
                   {sortedWorkingArea.map((tile) => {
-                    const wasFromHand = gameState?.turnStartHand.some((t) => t.id === tile.id)
+                    const wasFromHand = gameState.turnStartHand.some((t) => t.id === tile.id)
                     return (
                       <div key={tile.id} className="relative">
                         <GameTile
@@ -631,80 +502,77 @@ export function PlayerController({
           )}
         </div>
 
-        <div className="border-t border-border/10 backdrop-blur-sm">
-          <div className="bg-gradient-to-b from-card/80 to-card/60 px-3 py-2">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => setHandExpanded(!handExpanded)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                disabled={queueMode}
-              >
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                  Your Hand ({myHand.length})
-                </h3>
-                {!queueMode &&
-                  (handExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                  ))}
-              </button>
-
-              {totalSelected > 0 && (isMyTurn || queueMode) && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{totalSelected} selected</span>
-                  <Button
-                    size="sm"
-                    variant={wouldBeValidMeld ? "default" : "secondary"}
-                    onClick={createMeld}
-                    disabled={allSelectedTiles.length < 3}
-                    className="gap-1 h-7 text-xs"
-                  >
-                    <Plus className="w-3 h-3" />
-                    {wouldBeValidMeld ? "Meld" : `+${3 - allSelectedTiles.length}`}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 w-7 p-0">
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
+        <div className="flex-shrink-0 bg-card/50 backdrop-blur-sm p-3 border-t border-border/30">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => setHandExpanded(!handExpanded)}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <Hand className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Your Hand ({myHand.length})
+              </h3>
+              {handExpanded ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
               )}
-            </div>
+            </button>
 
-            {(handExpanded || queueMode || !isMyTurn) && (
-              <>
-                {!myPlayer?.hasInitialMeld && (
-                  <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
-                    <p className="text-xs text-foreground">
-                      First move: melds totaling <strong>{initialMeldThreshold}+ pts</strong> from your hand only
-                      {totalNewPoints > 0 && (
-                        <span className="ml-2 text-primary font-semibold">({totalNewPoints} pts)</span>
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                <div className="max-h-40 overflow-y-auto">
-                  <div className="flex flex-wrap gap-1.5 content-start">
-                    {sortedHand.map((tile) => (
-                      <GameTile
-                        key={tile.id}
-                        tile={tile}
-                        size="sm"
-                        selected={selectedTiles.has(tile.id)}
-                        onClick={isMyTurn || queueMode ? () => toggleTileSelection(tile.id) : undefined}
-                      />
-                    ))}
-
-                    {sortedHand.length === 0 && <p className="text-muted-foreground text-sm py-2">No tiles in hand</p>}
-                  </div>
-                </div>
-              </>
+            {totalSelected > 0 && isMyTurn && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{totalSelected} selected</span>
+                <Button
+                  size="sm"
+                  variant={wouldBeValidMeld ? "default" : "secondary"}
+                  onClick={createMeld}
+                  disabled={allSelectedTiles.length < 3}
+                  className="gap-1 h-7 text-xs"
+                >
+                  <Plus className="w-3 h-3" />
+                  {wouldBeValidMeld ? "Meld" : `+${3 - allSelectedTiles.length}`}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 w-7 p-0">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             )}
           </div>
+
+          {handExpanded && (
+            <>
+              {!myPlayer?.hasInitialMeld && (
+                <div className="mb-2 py-1.5 px-3 bg-primary/20 border border-primary/30 rounded-md text-center">
+                  <p className="text-xs text-foreground">
+                    First move: melds totaling <strong>{initialMeldThreshold}+ pts</strong> from your hand only
+                    {totalNewPoints > 0 && (
+                      <span className="ml-2 text-primary font-semibold">({totalNewPoints} pts)</span>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              <div className="max-h-40 overflow-y-auto">
+                <div className="flex flex-wrap gap-1.5 content-start">
+                  {sortedHand.map((tile) => (
+                    <GameTile
+                      key={tile.id}
+                      tile={tile}
+                      size="md"
+                      selected={selectedTiles.has(tile.id)}
+                      onClick={isMyTurn ? () => toggleTileSelection(tile.id) : undefined}
+                    />
+                  ))}
+
+                  {sortedHand.length === 0 && <p className="text-muted-foreground text-sm py-2">No tiles in hand</p>}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {(isMyTurn || queueMode) && (
+      {isMyTurn && (
         <div className="flex-shrink-0 p-3 border-t border-border/50 bg-card/80 backdrop-blur-sm safe-area-pb">
           {hasChangesToReset && (
             <div className="flex justify-center gap-4 mb-2">
@@ -720,63 +588,24 @@ export function PlayerController({
             </div>
           )}
           <div className="flex gap-2">
-            {isMyTurn && (
-              <Button
-                onClick={handleDrawAndPass}
-                variant="outline"
-                className="flex-1 h-12 gap-2 bg-transparent text-base cursor-pointer active:scale-95 transition-transform hover:bg-secondary/50"
-                disabled={hasPlayed}
-              >
-                <Download className="w-5 h-5" />
-                Draw & Pass
-              </Button>
-            )}
             <Button
-              onClick={handleEndTurn}
-              className="flex-1 h-12 gap-2 text-base cursor-pointer active:scale-95 transition-transform"
-              disabled={
-                !isMyTurn ||
-                !(
-                  myPlayer &&
-                  myPlayer.hasInitialMeld &&
-                  canEndTurn(myPlayer, melds, myHand, workingArea, gameState?.rules!).canEnd
-                )
-              }
+              variant="outline"
+              className="flex-1 h-12 gap-2 bg-transparent text-base cursor-pointer active:scale-95 transition-transform hover:bg-secondary/50"
+              onClick={handleDrawTile}
             >
-              {queueMode ? (
-                <>
-                  <Clock className="w-5 h-5" />
-                  Queue Move
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-5 h-5" />
-                  End Turn
-                </>
-              )}
+              <Download className="w-5 h-5" />
+              Draw & Pass
+            </Button>
+            <Button
+              className="flex-1 h-12 gap-2 text-base cursor-pointer active:scale-95 transition-transform"
+              onClick={onEndTurn}
+            >
+              <Send className="w-5 h-5" />
+              End Turn
             </Button>
           </div>
         </div>
       )}
-
-      {myPlayer?.queuedTurn && (
-        <QueuedMoveViewer
-          open={showQueuedMoveViewer}
-          onOpenChange={setShowQueuedMoveViewer}
-          queuedTurn={myPlayer.queuedTurn}
-          onClearQueue={onClearQueuedTurn}
-        />
-      )}
-
-      <SettingsModal
-        open={showSettingsModal}
-        onOpenChange={setShowSettingsModal}
-        roomStyleId={roomStyleId}
-        onStyleChange={() => {}}
-        isHost={false}
-      />
-      <EndGameModal isOpen={showEndGameModal} onClose={() => setShowEndGameModal(false)} onConfirm={onEndGame} />
-      <DrawnTileModal tile={drawnTile} onClose={() => setDrawnTile(null)} />
     </div>
   )
 }

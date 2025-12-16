@@ -16,13 +16,11 @@ interface GamePageClientProps {
 }
 
 export function GamePageClient({ roomCode, pendingLogin }: GamePageClientProps) {
-  console.log("[v0] GamePageClient: rendering", { roomCode, playerName: pendingLogin.playerName })
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [confirmedPlayer, setConfirmedPlayer] = useState<{ playerId: string; playerName: string } | null>(null)
 
   const handleConfirm = useCallback(async () => {
-    console.log("[v0] GamePageClient: handleConfirm called")
     setIsLoading(true)
     try {
       const response = await fetch("/api/game", {
@@ -35,19 +33,15 @@ export function GamePageClient({ roomCode, pendingLogin }: GamePageClientProps) 
         }),
       })
       const data = await response.json()
-      console.log("[v0] GamePageClient: login response =", data)
 
       if (data.success && data.playerId && data.playerName) {
         await setPlayerCookie(data.playerId, data.playerName, roomCode)
-        console.log("[v0] GamePageClient: Cookie set, confirming player")
         setConfirmedPlayer({ playerId: data.playerId, playerName: data.playerName })
       } else {
-        console.log("[v0] GamePageClient: Login failed, redirecting")
         // Login failed, redirect to home
         router.push(`/?join=${roomCode}`)
       }
-    } catch (err) {
-      console.error("[v0] GamePageClient: Login error:", err)
+    } catch {
       router.push(`/?join=${roomCode}`)
     } finally {
       setIsLoading(false)
@@ -55,13 +49,11 @@ export function GamePageClient({ roomCode, pendingLogin }: GamePageClientProps) 
   }, [roomCode, pendingLogin.playerCode, router])
 
   const handleDeny = useCallback(() => {
-    console.log("[v0] GamePageClient: handleDeny called")
     router.push(`/?join=${roomCode}`)
   }, [roomCode, router])
 
   // Show loading state while confirming
   if (isLoading) {
-    console.log("[v0] GamePageClient: Showing loading state")
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -72,14 +64,12 @@ export function GamePageClient({ roomCode, pendingLogin }: GamePageClientProps) 
 
   // If confirmed, show the game
   if (confirmedPlayer) {
-    console.log("[v0] GamePageClient: Showing GameClient for confirmed player")
     return (
       <GameClient roomCode={roomCode} playerId={confirmedPlayer.playerId} playerName={confirmedPlayer.playerName} />
     )
   }
 
   // Show confirmation modal
-  console.log("[v0] GamePageClient: Showing confirmation modal")
   return (
     <div className="min-h-screen bg-background">
       <PlayerConfirmModal

@@ -10,8 +10,6 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { clearPlayerCookie } from "@/lib/cookies"
 import { showTurnNotification } from "@/lib/notifications"
 import { playTurnSound } from "@/lib/settings"
-import { useQueueMode } from "@/lib/queue-mode-context"
-import { QueueModeProvider } from "@/lib/queue-mode-context"
 import type { GameState, Meld, Tile, RoomStyleId } from "@/lib/game-types"
 import { Loader2 } from "lucide-react"
 
@@ -21,15 +19,11 @@ interface GameClientProps {
   playerName: string
 }
 
-interface GameClientInnerProps extends GameClientProps {
-  gameState: GameState | null
-  setGameState: (state: GameState | null) => void
-}
-
-function GameClientInner({ roomCode, playerId, playerName, gameState, setGameState }: GameClientInnerProps) {
-  const { queueMode, dispatchAction, enterQueueMode, exitQueueMode, getPendingChanges, hasQueuedTurn } = useQueueMode()
+export function GameClient({ roomCode, playerId, playerName }: GameClientProps) {
   const router = useRouter()
   const isMobile = useIsMobile()
+
+  const [gameState, setGameState] = useState<GameState | null>(null)
   const [roomStyleId, setRoomStyleId] = useState<RoomStyleId>("classic")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -137,12 +131,6 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 
   const playTiles = useCallback(
     async (melds: Meld[], hand: Tile[], workingArea: Tile[] = []) => {
-      if (queueMode) {
-        console.log("[v0] Queueing tile play")
-        dispatchAction({ type: "updateState", melds, hand, workingArea })
-        return
-      }
-
       try {
         await apiCall({ action: "play_tiles", roomCode, playerId, melds, hand, workingArea })
         pollGameState()
@@ -150,16 +138,10 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
         setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to play tiles")
       }
     },
-    [queueMode, dispatchAction, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp],
+    [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp],
   )
 
   const drawTile = useCallback(async (): Promise<Tile | null> => {
-    if (queueMode) {
-      console.log("[v0] Queueing tile draw")
-      dispatchAction({ type: "drawTile" })
-      return null
-    }
-
     try {
       const data = await apiCall({ action: "draw_tile", roomCode, playerId })
       pollGameState()
@@ -168,39 +150,25 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to draw tile")
       return null
     }
-  }, [queueMode, dispatchAction, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const endTurn = useCallback(async () => {
-    if (queueMode) {
-      console.log("[v0] Queueing turn end")
-      dispatchAction({ type: "endTurn" })
-      return
-    }
-
     try {
       await apiCall({ action: "end_turn", roomCode, playerId })
       pollGameState()
     } catch (err) {
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to end turn")
     }
-  }, [queueMode, dispatchAction, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const resetTurn = useCallback(async () => {
-    if (queueMode) {
-      console.log("[v0] Resetting queue mode changes")
-      // Re-enter queue mode to reset to base state
-      exitQueueMode()
-      enterQueueMode()
-      return
-    }
-
     try {
       await apiCall({ action: "reset_turn", roomCode, playerId })
       pollGameState()
     } catch (err) {
       setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to reset turn")
     }
-  }, [queueMode, enterQueueMode, exitQueueMode, roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
+  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
 
   const endGame = useCallback(async () => {
     try {
@@ -235,77 +203,6 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
     [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp],
   )
 
-  const queueTurn = useCallback(async () => {
-    const pending = getPendingChanges()
-    if (!pending) {
-      console.error("[v0] No pending changes to queue")
-      return
-    }
-
-    console.log("[v0] Queueing turn:", {
-      roomCode,
-      playerId: playerId ? playerId.slice(0, 8) : "undefined",
-      meldsCount: pending.melds.length,
-      handSize: pending.hand.length,
-      workingAreaSize: pending.workingArea.length,
-    })
-
-    try {
-      await apiCall({
-        action: "queue_turn",
-        roomCode,
-        playerId,
-        plannedMelds: pending.melds,
-        plannedHand: pending.hand,
-        plannedWorkingArea: pending.workingArea,
-      })
-      pollGameState()
-      exitQueueMode()
-      console.log("[v0] Turn queued successfully")
-    } catch (err) {
-      console.error("[v0] Queue turn failed:", err)
-      setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to queue turn")
-    }
-  }, [roomCode, playerId, apiCall, pollGameState, exitQueueMode, getPendingChanges, setErrorWithTimestamp])
-
-  const clearQueuedTurn = useCallback(async () => {
-    console.log("[v0] Clearing queued turn:", {
-      roomCode,
-      playerId: playerId ? playerId.slice(0, 8) : "undefined",
-    })
-
-    try {
-      await apiCall({ action: "clear_queued_turn", roomCode, playerId })
-      pollGameState()
-      console.log("[v0] Queued turn cleared successfully")
-    } catch (err) {
-      console.error("[v0] Clear queued turn failed:", err)
-      setErrorWithTimestamp(err instanceof Error ? err.message : "Failed to clear queued turn")
-    }
-  }, [roomCode, playerId, apiCall, pollGameState, setErrorWithTimestamp])
-
-  const handleToggleQueueMode = useCallback(
-    (enabled: boolean) => {
-      console.log("[v0] Toggling queue mode:", {
-        enabled,
-        roomCode,
-        playerId: playerId ? playerId.slice(0, 8) : "undefined",
-      })
-
-      if (enabled) {
-        if (hasQueuedTurn()) {
-          console.log("[v0] Player already has a queued turn")
-          // Don't enter queue mode, show the viewer instead
-          return
-        }
-        enterQueueMode()
-      } else {
-        exitQueueMode()
-      }
-    },
-    [hasQueuedTurn, enterQueueMode, exitQueueMode, roomCode, playerId],
-  )
-
   const disconnect = useCallback(async () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
@@ -323,7 +220,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   }, [roomCode, playerId, apiCall, router])
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || !gameState) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -333,15 +230,16 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   }
 
   // Determine current view
-  const currentPlayer = gameState?.players.find((p) => p.id === playerId)
+  const currentPlayer = gameState.players.find((p) => p.id === playerId)
   const isHost = currentPlayer?.isHost ?? false
 
   // In lobby
-  if (gameState?.phase === "lobby") {
+  if (gameState.phase === "lobby") {
     return (
       <LobbyScreen
         roomCode={roomCode}
         playerId={playerId}
+        gameState={gameState}
         roomStyleId={roomStyleId}
         isHost={isHost}
         onStartGame={startGame}
@@ -353,16 +251,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   }
 
   // Game ended
-  if (gameState?.phase === "ended") {
-    if (!gameState) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading game results...</p>
-        </div>
-      )
-    }
-
+  if (gameState.phase === "ended") {
     return (
       <GameEndScreen
         gameState={gameState}
@@ -379,6 +268,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
   if (isMobile || !isHost) {
     return (
       <PlayerController
+        gameState={gameState}
         playerId={playerId}
         roomCode={roomCode}
         roomStyleId={roomStyleId}
@@ -387,9 +277,6 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
         onEndTurn={endTurn}
         onResetTurn={resetTurn}
         onEndGame={endGame}
-        onQueueTurn={queueTurn}
-        onClearQueuedTurn={clearQueuedTurn}
-        onToggleQueueMode={handleToggleQueueMode}
         error={error}
       />
     )
@@ -397,6 +284,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 
   return (
     <GameBoard
+      gameState={gameState}
       playerId={playerId}
       roomCode={roomCode}
       roomStyleId={roomStyleId}
@@ -407,35 +295,7 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
       onResetTurn={resetTurn}
       onEndGame={endGame}
       onChangeRoomStyle={changeRoomStyle}
-      onQueueTurn={queueTurn}
-      onClearQueuedTurn={clearQueuedTurn}
-      onToggleQueueMode={handleToggleQueueMode}
       error={error}
     />
   )
 }
-
-function GameClientWithProvider({ roomCode, playerId, playerName }: GameClientProps) {
-  console.log("[v0] GameClientWithProvider: rendering", {
-    roomCode,
-    playerId: playerId ? playerId.slice(0, 8) : "undefined",
-    playerName,
-  })
-  const [gameState, setGameState] = useState<GameState | null>(null)
-
-  console.log("[v0] GameClientWithProvider: gameState =", gameState ? "exists" : "null")
-
-  return (
-    <QueueModeProvider gameState={gameState} playerId={playerId}>
-      <GameClientInner
-        roomCode={roomCode}
-        playerId={playerId}
-        playerName={playerName}
-        gameState={gameState}
-        setGameState={setGameState}
-      />
-    </QueueModeProvider>
-  )
-}
-
-export { GameClientWithProvider as GameClient }

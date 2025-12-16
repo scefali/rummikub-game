@@ -1,12 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import * as gameStore from "@/lib/game-store"
-import {
-  sendTurnNotificationEmail,
-  sendGameLinkEmail,
-  sendQueuedTurnAutoplayedEmail,
-  sendQueuedTurnFailedEmail,
-} from "@/lib/email"
-import type { RoomStyleId, Meld, Tile } from "@/lib/game-types"
+import { sendTurnNotificationEmail, sendGameLinkEmail } from "@/lib/email"
+import type { RoomStyleId } from "@/lib/game-types"
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,25 +18,14 @@ export async function POST(request: NextRequest) {
       workingArea,
       styleId,
       targetPlayerId,
-      plannedMelds,
-      plannedHand,
-      plannedWorkingArea,
     } = body
 
-    console.log("[v0] API Request:", {
-      action,
-      roomCode,
-      playerName,
-      playerId: playerId ? playerId.slice(0, 8) : "undefined",
-    })
+    console.log("[v0] API Request:", { action, roomCode, playerName, playerId: playerId?.slice(0, 8) })
 
     switch (action) {
       case "create_room": {
         const result = await gameStore.createRoom(playerName, playerEmail)
-        console.log("[v0] Room created:", {
-          roomCode: result.roomCode,
-          playerId: result.playerId ? result.playerId.slice(0, 8) : "undefined",
-        })
+        console.log("[v0] Room created:", { roomCode: result.roomCode, playerId: result.playerId?.slice(0, 8) })
         return NextResponse.json({
           roomCode: result.roomCode,
           playerId: result.playerId,
@@ -135,46 +119,7 @@ export async function POST(request: NextRequest) {
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
-
-        if (result.autoPlayedPlayers) {
-          for (const player of result.autoPlayedPlayers) {
-            if (player.email && player.playerCode) {
-              sendQueuedTurnAutoplayedEmail(
-                player.email,
-                player.name,
-                roomCode,
-                player.playerCode,
-                player.melds,
-                result.roomStyleId,
-              ).catch((err) => console.error("[v0] Auto-play email send failed:", err))
-            }
-          }
-        }
-
-        if (result.failedPlayers) {
-          for (const player of result.failedPlayers) {
-            if (player.email && player.playerCode) {
-              sendQueuedTurnFailedEmail(
-                player.email,
-                player.name,
-                roomCode,
-                player.playerCode,
-                player.reason,
-                player.boardChanges,
-                player.queuedAt,
-                player.baseRevision,
-                result.roomStyleId,
-              ).catch((err) => console.error("[v0] Failed turn email send failed:", err))
-            }
-          }
-        }
-
-        // Only send "it's your turn" if no queued turn was auto-played or failed for this player
-        const nextPlayerEmailSent =
-          result.autoPlayedPlayers?.some((p) => p.email === result.nextPlayer?.email) ||
-          result.failedPlayers?.some((p) => p.email === result.nextPlayer?.email)
-
-        if (!nextPlayerEmailSent && result.nextPlayer?.email && result.nextPlayer?.playerCode) {
+        if (result.nextPlayer?.email && result.nextPlayer?.playerCode) {
           sendTurnNotificationEmail(
             result.nextPlayer.email,
             result.nextPlayer.name,
@@ -184,7 +129,6 @@ export async function POST(request: NextRequest) {
             result.roomStyleId,
           ).catch((err) => console.error("[v0] Email send failed:", err))
         }
-
         return NextResponse.json({ success: true, drawnTile: result.drawnTile })
       }
 
@@ -193,46 +137,7 @@ export async function POST(request: NextRequest) {
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }
-
-        if (result.autoPlayedPlayers) {
-          for (const player of result.autoPlayedPlayers) {
-            if (player.email && player.playerCode) {
-              sendQueuedTurnAutoplayedEmail(
-                player.email,
-                player.name,
-                roomCode,
-                player.playerCode,
-                player.melds,
-                result.roomStyleId,
-              ).catch((err) => console.error("[v0] Auto-play email send failed:", err))
-            }
-          }
-        }
-
-        if (result.failedPlayers) {
-          for (const player of result.failedPlayers) {
-            if (player.email && player.playerCode) {
-              sendQueuedTurnFailedEmail(
-                player.email,
-                player.name,
-                roomCode,
-                player.playerCode,
-                player.reason,
-                player.boardChanges,
-                player.queuedAt,
-                player.baseRevision,
-                result.roomStyleId,
-              ).catch((err) => console.error("[v0] Failed turn email send failed:", err))
-            }
-          }
-        }
-
-        // Only send "it's your turn" if no queued turn was auto-played or failed for this player
-        const nextPlayerEmailSent =
-          result.autoPlayedPlayers?.some((p) => p.email === result.nextPlayer?.email) ||
-          result.failedPlayers?.some((p) => p.email === result.nextPlayer?.email)
-
-        if (!nextPlayerEmailSent && result.nextPlayer?.email && result.nextPlayer?.playerCode) {
+        if (result.nextPlayer?.email && result.nextPlayer?.playerCode) {
           sendTurnNotificationEmail(
             result.nextPlayer.email,
             result.nextPlayer.name,
@@ -242,7 +147,6 @@ export async function POST(request: NextRequest) {
             result.roomStyleId,
           ).catch((err) => console.error("[v0] Email send failed:", err))
         }
-
         return NextResponse.json({ success: true, gameEnded: result.gameEnded, winner: result.winner })
       }
 
@@ -277,28 +181,6 @@ export async function POST(request: NextRequest) {
 
       case "boot_player": {
         const result = await gameStore.bootPlayer(roomCode, playerId, targetPlayerId)
-        if (!result.success) {
-          return NextResponse.json({ error: result.error }, { status: 400 })
-        }
-        return NextResponse.json({ success: true })
-      }
-
-      case "queue_turn": {
-        const result = await gameStore.queueTurn(
-          roomCode,
-          playerId,
-          plannedMelds as Meld[],
-          plannedHand as Tile[],
-          plannedWorkingArea as Tile[],
-        )
-        if (!result.success) {
-          return NextResponse.json({ error: result.error }, { status: 400 })
-        }
-        return NextResponse.json({ success: true })
-      }
-
-      case "clear_queued_turn": {
-        const result = await gameStore.clearQueuedTurn(roomCode, playerId)
         if (!result.success) {
           return NextResponse.json({ error: result.error }, { status: 400 })
         }

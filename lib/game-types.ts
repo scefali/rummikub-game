@@ -28,18 +28,6 @@ export interface Player {
   email?: string // Optional email field
   playerCode: string // 6-character code for cross-device login
   lastSeenMeldTileIds?: string[] // Tile IDs on board when player last ended turn
-  queuedTurn?: QueuedTurn | null // Add queued turn for async play
-}
-
-// QueuedTurn type for offline turn queueing
-export interface QueuedTurn {
-  id: string
-  queuedAt: number
-  baseRevision: number
-  baseBoardSignature: string
-  plannedMelds: Meld[]
-  plannedHand: Tile[]
-  plannedWorkingArea: Tile[]
 }
 
 // Game phases
@@ -57,7 +45,6 @@ export interface GameState {
   turnStartHand: Tile[] // Snapshot of hand at turn start
   workingArea: Tile[] // Tiles taken from board being rearranged
   rules?: GameRules // Add rules to game state (set when game starts)
-  revision: number // Track state version for queued turn validation
 }
 
 // Room state

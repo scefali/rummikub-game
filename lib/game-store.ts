@@ -10,8 +10,6 @@ import {
   nextPlayer,
   checkGameEnd,
   canEndTurn,
-  computeBoardSignature,
-  formatTile,
 } from "./game-logic"
 
 const redis = new Redis({
@@ -66,8 +64,7 @@ export async function createRoom(
     isConnected: true,
     email: playerEmail || undefined,
     playerCode,
-    lastSeenMeldTileIds: [],
-    queuedTurn: null,
+    lastSeenMeldTileIds: [], // Initialize lastSeenMeldTileIds as empty for the host
   }
 
   const room: Room = {
@@ -83,7 +80,6 @@ export async function createRoom(
       turnStartHand: [],
       workingArea: [],
       rules: getRulesForPlayerCount(1),
-      revision: 0,
     },
     createdAt: Date.now(),
     roomStyleId: "classic",
@@ -133,8 +129,7 @@ export async function joinRoom(
     isConnected: true,
     email: playerEmail || undefined,
     playerCode,
-    lastSeenMeldTileIds: [],
-    queuedTurn: null,
+    lastSeenMeldTileIds: [], // Initialize lastSeenMeldTileIds as empty for all players
   }
 
   room.gameState.players.push(player)
@@ -190,7 +185,7 @@ export async function getGameState(
 export async function startGame(
   roomCode: string,
   playerId: string,
-): Promise<{
+): Promise<{ 
   success: boolean
   gameState?: GameState
   error?: string
@@ -209,6 +204,7 @@ export async function startGame(
     return { success: false, error: `Need at least ${MIN_PLAYERS} players to start` }
   }
 
+  // Collect players with emails before initializing (for sending game link emails)
   const playersForEmail = room.gameState.players
     .filter((p) => p.email && p.playerCode)
     .map((p) => ({
@@ -230,16 +226,14 @@ export async function startGame(
   const rules = getRulesForPlayerCount(playerData.length)
   room.gameState = initializeGame(playerData, rules)
 
-  room.gameState.revision = 0
-
   const currentPlayer = room.gameState.players[0]
   room.gameState.turnStartHand = [...currentPlayer.hand]
   room.gameState.turnStartMelds = JSON.parse(JSON.stringify(room.gameState.melds))
 
   await setRoom(room)
 
-  return {
-    success: true,
+  return { 
+    success: true, 
     gameState: room.gameState,
     playersForEmail,
     roomStyleId: room.roomStyleId,
@@ -266,7 +260,6 @@ export async function playTiles(
   room.gameState.melds = melds
   currentPlayer.hand = hand
   room.gameState.workingArea = workingArea
-  room.gameState.revision++
   await setRoom(room)
 
   return { success: true }
@@ -282,16 +275,6 @@ export async function handleDrawTile(
   nextPlayer?: { name: string; email?: string; playerCode?: string }
   playerStandings?: { name: string; tileCount: number }[]
   roomStyleId?: RoomStyleId
-  autoPlayedPlayers?: { name: string; email?: string; playerCode?: string; melds: Meld[] }[]
-  failedPlayers?: {
-    name: string
-    email?: string
-    playerCode?: string
-    reason: string
-    boardChanges: { added: string[]; removed: string[] }
-    queuedAt: number
-    baseRevision: number
-  }[]
 }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -303,6 +286,7 @@ export async function handleDrawTile(
     return { success: false, error: "Not your turn" }
   }
 
+  // Revert any changes made during the turn
   room.gameState.melds = JSON.parse(JSON.stringify(room.gameState.turnStartMelds))
   currentPlayer.hand = [...room.gameState.turnStartHand]
   room.gameState.workingArea = []
@@ -318,16 +302,11 @@ export async function handleDrawTile(
   })
   currentPlayer.lastSeenMeldTileIds = currentMeldTileIds
 
-  room.gameState.revision++
-
+  // Move to next player
   room.gameState.currentPlayerIndex = nextPlayer(room.gameState)
-
-  const { autoPlayedPlayers, failedPlayers } = await tryAutoPlayQueuedTurns(room)
-
   const nextPlayerObj = room.gameState.players[room.gameState.currentPlayerIndex]
   room.gameState.turnStartHand = [...nextPlayerObj.hand]
   room.gameState.turnStartMelds = JSON.parse(JSON.stringify(room.gameState.melds))
-  room.gameState.workingArea = []
 
   await setRoom(room)
 
@@ -346,8 +325,6 @@ export async function handleDrawTile(
     },
     playerStandings,
     roomStyleId: room.roomStyleId,
-    autoPlayedPlayers,
-    failedPlayers,
   }
 }
 
@@ -362,17 +339,6 @@ export async function handleEndTurn(
   nextPlayer?: { name: string; email?: string; playerCode?: string }
   playerStandings?: { name: string; tileCount: number }[]
   roomStyleId?: RoomStyleId
-  autoPlayedPlayers?: { name: string; email?: string; playerCode?: string; melds: Meld[] }[]
-  failedPlayers?: {
-    name: string
-    email?: string
-    playerCode?: string
-    reason: string
-    boardChanges: { added: string[]; removed: string[] }
-    queuedAt: number
-    baseRevision: number
-    currentRevision: number
-  }[]
 }> {
   const room = await getRoom(roomCode)
   if (!room || room.gameState.phase !== "playing") {
@@ -407,8 +373,6 @@ export async function handleEndTurn(
   })
   currentPlayer.lastSeenMeldTileIds = currentMeldTileIds
 
-  room.gameState.revision++
-
   const endCheck = checkGameEnd(room.gameState)
   if (endCheck.ended) {
     room.gameState.phase = "ended"
@@ -418,9 +382,6 @@ export async function handleEndTurn(
   }
 
   room.gameState.currentPlayerIndex = nextPlayer(room.gameState)
-
-  const { autoPlayedPlayers, failedPlayers } = await tryAutoPlayQueuedTurns(room)
-
   const nextPlayerObj = room.gameState.players[room.gameState.currentPlayerIndex]
   room.gameState.turnStartHand = [...nextPlayerObj.hand]
   room.gameState.turnStartMelds = JSON.parse(JSON.stringify(room.gameState.melds))
@@ -442,8 +403,6 @@ export async function handleEndTurn(
     },
     playerStandings,
     roomStyleId: room.roomStyleId,
-    autoPlayedPlayers,
-    failedPlayers,
   }
 }
 
@@ -458,11 +417,10 @@ export async function resetTurn(roomCode: string, playerId: string): Promise<{ s
     return { success: false, error: "Not your turn" }
   }
 
+  // Restore to turn start state
   room.gameState.melds = JSON.parse(JSON.stringify(room.gameState.turnStartMelds))
   currentPlayer.hand = [...room.gameState.turnStartHand]
   room.gameState.workingArea = []
-
-  room.gameState.revision++
 
   await setRoom(room)
 
@@ -473,6 +431,7 @@ export async function endGame(roomCode: string, playerId: string): Promise<{ suc
   const room = await getRoom(roomCode)
   if (!room) return { success: false, error: "Room not found" }
 
+  // Reset game state to lobby
   room.gameState.phase = "lobby"
   room.gameState.melds = []
   room.gameState.tilePool = []
@@ -482,14 +441,13 @@ export async function endGame(roomCode: string, playerId: string): Promise<{ suc
   room.gameState.turnStartHand = []
   room.gameState.workingArea = []
 
+  // Reset all players
   room.gameState.players = room.gameState.players.map((p) => ({
     ...p,
     hand: [],
     hasInitialMeld: false,
-    lastSeenMeldTileIds: [],
+    lastSeenMeldTileIds: [], // Reset lastSeenMeldTileIds for all players
   }))
-
-  room.gameState.revision++
 
   await setRoom(room)
 
@@ -559,28 +517,34 @@ export async function bootPlayer(
   const room = await getRoom(roomCode)
   if (!room) return { success: false, error: "Room not found" }
 
+  // Can only boot in lobby
   if (room.gameState.phase !== "lobby") {
     return { success: false, error: "Can only boot players in lobby" }
   }
 
+  // Make sure requesting player is in the room
   const requestingPlayer = room.gameState.players.find((p) => p.id === requestingPlayerId)
   if (!requestingPlayer) {
     return { success: false, error: "You are not in this room" }
   }
 
+  // Find target player
   const targetIndex = room.gameState.players.findIndex((p) => p.id === targetPlayerId)
   if (targetIndex === -1) {
     return { success: false, error: "Player not found" }
   }
 
   const targetPlayer = room.gameState.players[targetIndex]
-
+  
+  // Can't boot yourself
   if (targetPlayerId === requestingPlayerId) {
     return { success: false, error: "Cannot boot yourself" }
   }
 
+  // Remove the player
   room.gameState.players.splice(targetIndex, 1)
 
+  // If we booted the host, assign a new host
   if (targetPlayer.isHost && room.gameState.players.length > 0) {
     room.gameState.players[0].isHost = true
   }
@@ -588,261 +552,4 @@ export async function bootPlayer(
   await setRoom(room)
 
   return { success: true }
-}
-
-export async function queueTurn(
-  roomCode: string,
-  playerId: string,
-  plannedMelds: Meld[],
-  plannedHand: Tile[],
-  plannedWorkingArea: Tile[],
-): Promise<{ success: boolean; error?: string }> {
-  console.log("[v0] Queue turn request:", {
-    roomCode,
-    playerId: playerId ? playerId.slice(0, 8) : "undefined",
-    meldsCount: plannedMelds.length,
-    handSize: plannedHand.length,
-    workingAreaSize: plannedWorkingArea.length,
-  })
-
-  const room = await getRoom(roomCode)
-  if (!room || room.gameState.phase !== "playing") {
-    console.log("[v0] Queue turn failed: Game not in progress")
-    return { success: false, error: "Game not in progress" }
-  }
-
-  const player = room.gameState.players.find((p) => p.id === playerId)
-  if (!player) {
-    console.log("[v0] Queue turn failed: Player not found")
-    return { success: false, error: "Player not found" }
-  }
-
-  if (room.gameState.players[room.gameState.currentPlayerIndex].id === playerId) {
-    console.log("[v0] Queue turn failed: Cannot queue on your own turn")
-    return { success: false, error: "Cannot queue turn when it's your turn" }
-  }
-
-  const baseBoardSignature = computeBoardSignature(room.gameState.melds)
-
-  console.log("[v0] Creating queued turn:", {
-    baseRevision: room.gameState.revision,
-    baseBoardSignature: baseBoardSignature.slice(0, 50) + "...",
-  })
-
-  player.queuedTurn = {
-    id: generateId(),
-    queuedAt: Date.now(),
-    baseRevision: room.gameState.revision,
-    baseBoardSignature,
-    plannedMelds,
-    plannedHand,
-    plannedWorkingArea,
-  }
-
-  await setRoom(room)
-  console.log("[v0] Turn queued successfully")
-  return { success: true }
-}
-
-export async function clearQueuedTurn(
-  roomCode: string,
-  playerId: string,
-): Promise<{ success: boolean; error?: string }> {
-  const room = await getRoom(roomCode)
-  if (!room) {
-    return { success: false, error: "Room not found" }
-  }
-
-  const player = room.gameState.players.find((p) => p.id === playerId)
-  if (!player) {
-    return { success: false, error: "Player not found" }
-  }
-
-  player.queuedTurn = null
-  await setRoom(room)
-  return { success: true }
-}
-
-async function tryAutoPlayQueuedTurns(room: Room): Promise<{
-  autoPlayedPlayers: { name: string; email?: string; playerCode?: string; melds: Meld[] }[]
-  failedPlayers: {
-    name: string
-    email?: string
-    playerCode?: string
-    reason: string
-    boardChanges: { added: string[]; removed: string[] }
-    queuedAt: number
-    baseRevision: number
-    currentRevision: number
-  }[]
-}> {
-  const autoPlayedPlayers: { name: string; email?: string; playerCode?: string; melds: Meld[] }[] = []
-  const failedPlayers: {
-    name: string
-    email?: string
-    playerCode?: string
-    reason: string
-    boardChanges: { added: string[]; removed: string[] }
-    queuedAt: number
-    baseRevision: number
-    currentRevision: number
-  }[] = []
-
-  const maxAttempts = room.gameState.players.length
-  let attempts = 0
-
-  console.log("[v0] Starting auto-play attempt for queued turns")
-
-  while (attempts < maxAttempts) {
-    attempts++
-    const currentPlayer = room.gameState.players[room.gameState.currentPlayerIndex]
-
-    console.log("[v0] Checking player for queued turn:", {
-      playerName: currentPlayer.name,
-      hasQueuedTurn: !!currentPlayer.queuedTurn,
-      attempt: attempts,
-    })
-
-    if (!currentPlayer.queuedTurn) {
-      console.log("[v0] No queued turn found, stopping auto-play loop")
-      break
-    }
-
-    const queuedTurn = currentPlayer.queuedTurn
-    const currentBoardSignature = computeBoardSignature(room.gameState.melds)
-    const boardChanged = queuedTurn.baseBoardSignature !== currentBoardSignature
-
-    console.log("[v0] Validating queued turn:", {
-      playerName: currentPlayer.name,
-      boardChanged,
-      baseRevision: queuedTurn.baseRevision,
-      currentRevision: room.gameState.revision,
-      queuedAt: new Date(queuedTurn.queuedAt).toISOString(),
-    })
-
-    const validation = canEndTurn(
-      { ...currentPlayer, hand: queuedTurn.plannedHand },
-      queuedTurn.plannedMelds,
-      room.gameState.turnStartHand,
-      room.gameState.turnStartMelds,
-      queuedTurn.plannedWorkingArea,
-      room.gameState.rules,
-    )
-
-    if (!validation.valid || boardChanged) {
-      const reason = boardChanged ? "Board changed since turn was queued" : validation.reason || "Invalid queued state"
-
-      console.log("[v0] Queued turn validation failed:", {
-        playerName: currentPlayer.name,
-        reason,
-        boardChanged,
-        validationReason: validation.reason,
-      })
-
-      const oldTileIds = new Set(queuedTurn.baseBoardSignature.split(",").filter((id) => id))
-      const newTileIds = new Set(currentBoardSignature.split(",").filter((id) => id))
-
-      const added: string[] = []
-      const removed: string[] = []
-
-      for (const id of newTileIds) {
-        if (!oldTileIds.has(id)) {
-          const tile = room.gameState.melds.flatMap((m) => m.tiles).find((t) => t.id === id)
-          if (tile) added.push(formatTile(tile))
-        }
-      }
-
-      for (const id of oldTileIds) {
-        if (!newTileIds.has(id)) {
-          const tile = queuedTurn.plannedMelds.flatMap((m) => m.tiles).find((t) => t.id === id)
-          if (tile) removed.push(formatTile(tile))
-        }
-      }
-
-      console.log("[v0] Board changes detected:", {
-        added: added.length,
-        removed: removed.length,
-        addedTiles: added.slice(0, 3),
-        removedTiles: removed.slice(0, 3),
-      })
-
-      failedPlayers.push({
-        name: currentPlayer.name,
-        email: currentPlayer.email,
-        playerCode: currentPlayer.playerCode,
-        reason,
-        boardChanges: { added, removed },
-        queuedAt: queuedTurn.queuedAt,
-        baseRevision: queuedTurn.baseRevision,
-        currentRevision: room.gameState.revision,
-      })
-
-      currentPlayer.queuedTurn = null
-      await setRoom(room)
-      console.log("[v0] Queued turn cleared due to validation failure")
-      break
-    }
-
-    console.log("[v0] Queued turn validated successfully, applying:", {
-      playerName: currentPlayer.name,
-      meldsCount: queuedTurn.plannedMelds.length,
-      handSize: queuedTurn.plannedHand.length,
-    })
-
-    room.gameState.melds = queuedTurn.plannedMelds
-    currentPlayer.hand = queuedTurn.plannedHand
-    room.gameState.workingArea = queuedTurn.plannedWorkingArea
-
-    if (!currentPlayer.hasInitialMeld) {
-      currentPlayer.hasInitialMeld = true
-    }
-
-    const currentMeldTileIds: string[] = []
-    room.gameState.melds.forEach((meld) => {
-      meld.tiles.forEach((t) => currentMeldTileIds.push(t.id))
-    })
-    currentPlayer.lastSeenMeldTileIds = currentMeldTileIds
-
-    room.gameState.revision++
-
-    autoPlayedPlayers.push({
-      name: currentPlayer.name,
-      email: currentPlayer.email,
-      playerCode: currentPlayer.playerCode,
-      melds: queuedTurn.plannedMelds,
-    })
-
-    currentPlayer.queuedTurn = null
-
-    console.log("[v0] Queued turn auto-played successfully:", {
-      playerName: currentPlayer.name,
-      newRevision: room.gameState.revision,
-    })
-
-    const endCheck = checkGameEnd(room.gameState)
-    if (endCheck.ended) {
-      console.log("[v0] Game ended after auto-play:", { winner: endCheck.winner })
-      room.gameState.phase = "ended"
-      room.gameState.winner = endCheck.winner || null
-      break
-    }
-
-    room.gameState.currentPlayerIndex = nextPlayer(room.gameState)
-    const nextPlayerObj = room.gameState.players[room.gameState.currentPlayerIndex]
-    room.gameState.turnStartHand = [...nextPlayerObj.hand]
-    room.gameState.turnStartMelds = JSON.parse(JSON.stringify(room.gameState.melds))
-    room.gameState.workingArea = []
-
-    console.log("[v0] Advanced to next player:", {
-      nextPlayerName: nextPlayerObj.name,
-      hasQueuedTurn: !!nextPlayerObj.queuedTurn,
-    })
-  }
-
-  console.log("[v0] Auto-play complete:", {
-    autoPlayedCount: autoPlayedPlayers.length,
-    failedCount: failedPlayers.length,
-  })
-
-  return { autoPlayedPlayers, failedPlayers }
 }
