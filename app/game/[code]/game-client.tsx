@@ -354,6 +354,15 @@ function GameClientInner({ roomCode, playerId, playerName, gameState, setGameSta
 
   // Game ended
   if (gameState?.phase === "ended") {
+    if (!gameState) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading game results...</p>
+        </div>
+      )
+    }
+
     return (
       <GameEndScreen
         gameState={gameState}

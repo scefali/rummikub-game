@@ -15,6 +15,14 @@ interface GameEndScreenProps {
 }
 
 export function GameEndScreen({ gameState, playerId, roomStyleId, onPlayAgain }: GameEndScreenProps) {
+  if (!gameState) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <p className="text-muted-foreground">Loading game results...</p>
+      </div>
+    )
+  }
+
   const winner = gameState.players.find((p) => p.id === gameState.winner)
   const isWinner = gameState.winner === playerId
 

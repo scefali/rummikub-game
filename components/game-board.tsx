@@ -614,6 +614,93 @@ export function GameBoard({
         </div>
       </div>
 
+      <div className="border-t border-border/50 bg-card/50 backdrop-blur-sm p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Hand</h3>
+            {!myPlayer?.hasInitialMeld && (
+              <Badge variant="default" className="text-xs">
+                Need {initialMeldThreshold}+ pts for first meld
+              </Badge>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {(isMyTurn || queueMode) && (
+              <>
+                {hasChangesToReset && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetTurn}
+                    className="gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset Move
+                  </Button>
+                )}
+                <Button onClick={handleEndTurn} size="lg" disabled={!canEnd}>
+                  {queueMode ? (
+                    <>
+                      <Clock className="w-4 h-4 mr-1" />
+                      Queue Move
+                    </>
+                  ) : (
+                    "End Turn"
+                  )}
+                </Button>
+                {isMyTurn && totalSelected === 0 && canEnd && (
+                  <Button onClick={handleDraw} variant="outline" size="sm">
+                    <Plus className="w-4 h-4 mr-1" />
+                    Draw & Pass
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {sortedTiles.map((tile) => (
+            <GameTile
+              key={tile.id}
+              tile={tile}
+              size="md"
+              selected={selectedTiles.has(tile.id)}
+              onClick={isMyTurn || queueMode ? () => toggleTileSelection(tile.id) : undefined}
+            />
+          ))}
+
+          {sortedTiles.length === 0 && <p className="text-muted-foreground text-sm py-4">No tiles in hand</p>}
+        </div>
+
+        {totalSelected > 0 && (isMyTurn || queueMode) && (
+          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border/50">
+            <span className="text-sm text-muted-foreground">{totalSelected} tiles selected</span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={wouldBeValidMeld ? "default" : "secondary"}
+                onClick={createMeld}
+                disabled={allSelectedTiles.length < 3}
+                className="gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                {wouldBeValidMeld ? "Create Meld" : `Need ${3 - allSelectedTiles.length} more`}
+              </Button>
+              {selectedWorkingTiles.size > 0 && (
+                <Button variant="outline" size="sm" onClick={returnSelectedToHand} className="gap-1 bg-transparent">
+                  <ArrowLeft className="w-4 h-4" />
+                  Return to Hand
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={clearSelection}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {isMyTurn && workingArea.length > 0 && (
         <div className="border-t border-amber-500/30 bg-amber-500/10 p-4">
           <div className="flex items-center justify-between mb-3">
@@ -650,95 +737,6 @@ export function GameBoard({
               )
             })}
           </div>
-        </div>
-      )}
-
-      {isMyTurn && (
-        <div className="border-t border-border/50 bg-card/50 backdrop-blur-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Hand</h3>
-              {!myPlayer.hasInitialMeld && (
-                <Badge variant="default" className="text-xs">
-                  Need {initialMeldThreshold}+ pts for first meld
-                </Badge>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {(isMyTurn || queueMode) && (
-                <>
-                  {hasChangesToReset && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleResetTurn}
-                      className="gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      Reset Move
-                    </Button>
-                  )}
-                  <Button onClick={handleEndTurn} size="lg" disabled={!canEnd}>
-                    {queueMode ? (
-                      <>
-                        <Clock className="w-4 h-4 mr-1" />
-                        Queue Move
-                      </>
-                    ) : (
-                      "End Turn"
-                    )}
-                  </Button>
-                  {isMyTurn && totalSelected === 0 && canEnd && (
-                    <Button onClick={handleDraw} variant="outline" size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Draw & Pass
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {sortedTiles.map((tile) => (
-              <GameTile
-                key={tile.id}
-                tile={tile}
-                size="md"
-                selected={selectedTiles.has(tile.id)}
-                onClick={isMyTurn ? () => toggleTileSelection(tile.id) : undefined}
-              />
-            ))}
-
-            {sortedTiles.length === 0 && <p className="text-muted-foreground text-sm py-4">No tiles in hand</p>}
-          </div>
-
-          {totalSelected > 0 && (isMyTurn || queueMode) && (
-            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border/50">
-              <span className="text-sm text-muted-foreground">{totalSelected} tiles selected</span>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={wouldBeValidMeld ? "default" : "secondary"}
-                  onClick={createMeld}
-                  disabled={allSelectedTiles.length < 3}
-                  className="gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  {wouldBeValidMeld ? "Create Meld" : `Need ${3 - allSelectedTiles.length} more`}
-                </Button>
-                {selectedWorkingTiles.size > 0 && (
-                  <Button variant="outline" size="sm" onClick={returnSelectedToHand} className="gap-1 bg-transparent">
-                    <ArrowLeft className="w-4 h-4" />
-                    Return to Hand
-                  </Button>
-                )}
-                <Button size="sm" variant="ghost" onClick={clearSelection}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
