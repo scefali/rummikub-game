@@ -22,7 +22,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
 
   if (playerCookie) {
     console.log("[v0] GamePage: Rendering GameClient with cookie auth")
-    return <GameClient roomCode={roomCode} playerId={playerCookie.playerId} playerName={playerCookie.name} />
+    return <GameClient roomCode={roomCode} playerId={playerCookie.odId} playerName={playerCookie.name} />
   }
 
   if (playerCode) {

@@ -57,7 +57,7 @@ A real-time multiplayer Rummikub game built as a Progressive Web App (PWA). Play
 
 ## 3. Project Structure Map
 
-\`\`\`
+```
 /app
   /api/game/route.ts           # Single API route for all game actions
   /game/[code]/
@@ -113,7 +113,7 @@ A real-time multiplayer Rummikub game built as a Progressive Web App (PWA). Play
 
 /styles
   globals.css                   # Legacy CSS file (unused, app/globals.css is active)
-\`\`\`
+```
 
 ## 4. Routing + Screens Inventory
 
@@ -130,7 +130,7 @@ A real-time multiplayer Rummikub game built as a Progressive Web App (PWA). Play
 ### Key Models (from `lib/game-types.ts`)
 
 #### `Tile`
-\`\`\`typescript
+```typescript
 {
   id: string                    // Unique tile ID
   color: "red" | "blue" | "yellow" | "black"
@@ -139,18 +139,18 @@ A real-time multiplayer Rummikub game built as a Progressive Web App (PWA). Play
   assignedNumber?: number       // What number this joker represents in a meld
   assignedColor?: TileColor     // What color this joker represents (for sets)
 }
-\`\`\`
+```
 
 #### `Meld`
-\`\`\`typescript
+```typescript
 {
   id: string
   tiles: Tile[]                 // 3+ tiles forming a valid run or set
 }
-\`\`\`
+```
 
 #### `Player`
-\`\`\`typescript
+```typescript
 {
   id: string                    // Generated per session
   name: string
@@ -162,10 +162,10 @@ A real-time multiplayer Rummikub game built as a Progressive Web App (PWA). Play
   playerCode: string            // 6-char code for cross-device login
   lastSeenMeldTileIds?: string[] // Tracks what tiles player last saw on board
 }
-\`\`\`
+```
 
 #### `GameState`
-\`\`\`typescript
+```typescript
 {
   phase: "lobby" | "playing" | "ended"
   players: Player[]
@@ -178,26 +178,26 @@ A real-time multiplayer Rummikub game built as a Progressive Web App (PWA). Play
   workingArea: Tile[]           // Tiles taken from board being rearranged
   rules?: GameRules             // Dynamic rules based on player count
 }
-\`\`\`
+```
 
 #### `Room`
-\`\`\`typescript
+```typescript
 {
   code: string                  // 4-char uppercase room code
   gameState: GameState
   createdAt: number             // Unix timestamp
   roomStyleId: RoomStyleId      // "classic" | "ocean" | "forest" | "sunset" | "neon"
 }
-\`\`\`
+```
 
 #### `GameRules`
-\`\`\`typescript
+```typescript
 {
   mode: "standard" | "large"    // Standard = 2-4 players, Large = 5-6 players
   startingHandSize: number      // 14 for standard, 12 for large
   initialMeldThreshold: number  // 30 for standard, 25 for large
 }
-\`\`\`
+```
 
 ### Redis Storage
 - **Key pattern**: `room:{ROOMCODE}` (e.g., `room:ABCD`)
@@ -303,7 +303,7 @@ All game actions go through **POST `/api/game`** with JSON body.
 ## 9. Configuration + Environment Variables
 
 ### Required Env Vars
-\`\`\`bash
+```bash
 # Redis (Upstash)
 KV_REST_API_URL=https://...upstash.io
 KV_REST_API_TOKEN=...
@@ -313,7 +313,7 @@ RESEND_API_KEY=re_...
 
 # App URL (for email links)
 NEXT_PUBLIC_APP_URL=https://yourapp.vercel.app
-\`\`\`
+```
 
 ### Optional Env Vars
 - None currently
@@ -340,21 +340,21 @@ NEXT_PUBLIC_APP_URL=https://yourapp.vercel.app
 
 ### How to Add a New API Endpoint
 1. **Add action**: In `/app/api/game/route.ts`, add new case to switch statement:
-   \`\`\`typescript
+   ```typescript
    case "your_action": {
      const result = await gameStore.yourFunction(roomCode, playerId, ...params)
      return NextResponse.json(result)
    }
-   \`\`\`
+   ```
 2. **Add game-store function**: In `/lib/game-store.ts`, create function:
-   \`\`\`typescript
+   ```typescript
    export async function yourFunction(roomCode: string, playerId: string, ...params) {
      const room = await getRoom(roomCode)
      // ... logic ...
      await setRoom(room)
      return { success: true }
    }
-   \`\`\`
+   ```
 3. **Add game-logic helper** (if needed): Pure functions in `/lib/game-logic.ts`
 4. **Call from client**: Use `fetch('/api/game', { method: 'POST', body: ... })`
 
@@ -367,36 +367,36 @@ NEXT_PUBLIC_APP_URL=https://yourapp.vercel.app
 ### How to Add New Analytics Events
 1. **Install tracker**: Already has `@vercel/analytics` package
 2. **Track event**: Import and call in component:
-   \`\`\`typescript
+   ```typescript
    import { track } from '@vercel/analytics'
    track('event_name', { property: value })
-   \`\`\`
+   ```
 3. **Common places**: Button clicks, game state changes, errors
 
 ### How to Gate Behind Auth/Roles
 - **Current auth**: Cookie-based playerId, no roles
 - **Host checks**: In API actions, check `player.isHost`:
-  \`\`\`typescript
+  ```typescript
   const player = room.gameState.players.find(p => p.id === playerId)
   if (!player?.isHost) return { error: "Only host can do this" }
-  \`\`\`
+  ```
 - **Turn checks**: Check `currentPlayerIndex`:
-  \`\`\`typescript
+  ```typescript
   if (room.gameState.players[room.gameState.currentPlayerIndex].id !== playerId) {
     return { error: "Not your turn" }
   }
-  \`\`\`
+  ```
 
 ### How to Add a New Setting/Config
 1. **LocalStorage setting**: Add to `/lib/settings.ts`:
-   \`\`\`typescript
+   ```typescript
    export function getYourSetting(): boolean {
      return localStorage.getItem('your_setting') === 'true'
    }
    export function setYourSetting(value: boolean) {
      localStorage.setItem('your_setting', String(value))
    }
-   \`\`\`
+   ```
 2. **Game-wide setting**: Add to `Room` or `GameState` in `/lib/game-types.ts`
 3. **UI**: Add to `/components/settings-modal.tsx`
 
@@ -408,7 +408,7 @@ NEXT_PUBLIC_APP_URL=https://yourapp.vercel.app
 ### How to Add a New Email Template
 1. **Create template**: `/lib/emails/your-email.tsx` (React Email component)
 2. **Add sender function**: In `/lib/email.ts`:
-   \`\`\`typescript
+   ```typescript
    export async function sendYourEmail(to: string, ...params) {
      const emailHtml = await render(<YourEmail ...params />)
      return resend.emails.send({
@@ -418,7 +418,7 @@ NEXT_PUBLIC_APP_URL=https://yourapp.vercel.app
        html: emailHtml,
      })
    }
-   \`\`\`
+   ```
 3. **Call from API**: In `/app/api/game/route.ts`, call `sendYourEmail().catch(err => ...)`
 
 ## 11. Known Risks / Gotchas
